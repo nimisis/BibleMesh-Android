@@ -1,9 +1,9 @@
 _Note:  Please don't use the zip download feature on this repo as this repo uses submodules and this is not supported at present by github and will result in an incomplete copy of the repo._
 
 
-Launcher-Android
+BibleMesh-Android
 ---------------------
-An Android application based on the Readium SDK to read ePub files. 
+An Android application based on the Readium Android app https://github.com/readium/SDKLauncher-Android used for reading ePub files.
 
 How to get source from github
 -------------------------------
