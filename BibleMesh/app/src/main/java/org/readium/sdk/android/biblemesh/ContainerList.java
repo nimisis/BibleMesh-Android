@@ -30,10 +30,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Stack;
 
+import org.json.JSONException;
 import org.readium.sdk.android.EPub3;
 import org.readium.sdk.android.Container;
 import org.readium.sdk.android.biblemesh.model.BookmarkDatabase;
 import org.readium.sdk.android.SdkErrorHandler;
+import org.readium.sdk.android.biblemesh.model.OpenPageRequest;
 
 import android.app.Activity;
 import android.content.Context;
@@ -114,11 +116,22 @@ public class ContainerList extends Activity implements SdkErrorHandler {
                 
                 ContainerHolder.getInstance().put(container.getNativePtr(), container);
 
-                Intent intent = new Intent(getApplicationContext(), BookDataActivity.class);
+                /*Intent intent = new Intent(getApplicationContext(), BookDataActivity.class);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 intent.putExtra(Constants.BOOK_NAME, bookName);
-                intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());
-                
+                intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());*/
+
+	            Intent intent = new Intent(context, WebViewActivity.class);
+	            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+	            intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());
+	            OpenPageRequest openPageRequest = OpenPageRequest.fromIdrefAndCfi(null, null);
+	            try {
+		            intent.putExtra(Constants.OPEN_PAGE_REQUEST_DATA, openPageRequest.toJSON().toString());
+		            //startActivity(intent);
+	            } catch (JSONException e) {
+		            Log.e("Biblemesh", ""+e.getMessage(), e);
+	            }
+
                 SdkErrorHandlerMessagesCompleted callback = new SdkErrorHandlerMessagesCompleted(intent) {
 					@Override
 					public void once() {
