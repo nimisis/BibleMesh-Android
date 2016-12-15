@@ -40,14 +40,14 @@ buildAssets.dependsOn "buildCssAssets",
         "buildSingleBundleAssets",
         "buildMultipleBundleAssets"
 
-apply from: 'build_epubReadingSystem.gradle'
+//apply from: 'build_epubReadingSystem.gradle'
 
 tasks.whenTaskAdded { task ->
     def taskName = task.name
 
     if (taskName.startsWith("compile")) {
         task.dependsOn "buildAssets",
-            ":epub3:buildMk",
-            "buildEpubReadingSystem"
+            ":epub3:buildMk"//,
+            //"buildEpubReadingSystem"
     }
 }
