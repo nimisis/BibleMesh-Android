@@ -11,7 +11,7 @@ buildscript {
         ndkDebug = (ndkDebug == "true") ? true : false;
         rootProject.ext.set('readium_ndk_debug', ndkDebug)
 
-        // Use stable gradle or experimental gradle
+        //Use stable gradle or experimental gradle
         if (ndkDebug) {
             classpath "com.android.tools.build:gradle-experimental:0.8.2"
         } else {

@@ -33,7 +33,7 @@ android {
 
     //fixme added to stop error with ViewerSettingsDialog
     lintOptions {
-        abortOnError false
-        checkReleaseBuilds false
+        abortOnError true
+        checkReleaseBuilds true
     }
 }

@@ -92,7 +92,8 @@ public class ContainerList extends Activity implements SdkErrorHandler {
                     context,
                     Environment.getExternalStorageDirectory().getAbsolutePath()
                             + "/" + testPath
-                            + "/ is empty, copy epub3 test file first please.",
+                            + "/ or /sdcard/"+testPath
+		                    + "/ looks empty. Enable Settings > Apps > BibleMesh > Permissions > Storage and copy epub3 test file(s) first please.",
                     Toast.LENGTH_LONG).show();
         }
 
