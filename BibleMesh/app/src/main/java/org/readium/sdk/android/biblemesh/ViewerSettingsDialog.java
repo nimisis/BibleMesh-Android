@@ -48,7 +48,7 @@ import android.widget.RadioGroup;
  *
  */
 public class ViewerSettingsDialog extends DialogFragment {
-	
+
 	/**
 	 * Interface to notify the listener when a viewer settings have been changed.
 	 */
@@ -61,7 +61,7 @@ public class ViewerSettingsDialog extends DialogFragment {
 	private OnViewerSettingsChange mListener;
 
 	private ViewerSettings mOriginalSettings;
-	
+
 	public ViewerSettingsDialog(OnViewerSettingsChange listener, ViewerSettings originalSettings) {
 		mListener = listener;
 		mOriginalSettings = originalSettings;

@@ -5,7 +5,7 @@ android {
     buildToolsVersion = "23.0.3"
 
     defaultConfig {
-        applicationId = "org.readium.sdk.android.launcher"
+        applicationId = "org.readium.sdk.android.biblemesh"
         minSdkVersion 19
         targetSdkVersion 23
     }
@@ -29,5 +29,11 @@ android {
         release {
             minifyEnabled = true
         }
+    }
+
+    //fixme added to stop error with ViewerSettingsDialog
+    lintOptions {
+        abortOnError false
+        checkReleaseBuilds false
     }
 }

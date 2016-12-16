@@ -6,7 +6,7 @@ model {
         buildToolsVersion = "23.0.3"
 
         defaultConfig.with {
-            applicationId="org.readium.sdk.android.launcher"
+            applicationId="org.readium.sdk.android.biblemesh"
             minSdkVersion.apiLevel   = 19
             targetSdkVersion.apiLevel = 23
         }
