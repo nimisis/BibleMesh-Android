@@ -40,6 +40,7 @@ import org.readium.sdk.android.biblemesh.model.OpenPageRequest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
@@ -78,8 +79,21 @@ public class ContainerList extends Activity implements SdkErrorHandler {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.container_list);
-        context = this;
+
+	    //uri scheme
+	    Intent intent = getIntent();
+	    Uri data = intent.getData();
+		if (data != null) {
+			//handle the request
+			List<String> params = data.getPathSegments();
+			String first = params.get(0);
+			String second = params.get(1);
+			Log.v("uri scheme params", "first:"+first+" second:"+second);
+		}
+
+		context = this;
         BookmarkDatabase.initInstance(getApplicationContext());
+
         final ListView view = (ListView) findViewById(R.id.containerList);
 
         final List<String> list = getInnerBooks();

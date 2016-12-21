@@ -353,9 +353,9 @@ public class WebViewActivity extends FragmentActivity implements
 	private void showSettings() {
 		FragmentManager fm = getSupportFragmentManager();
 		FragmentTransaction fragmentTransaction = fm.beginTransaction();
-		DialogFragment dialog = new ViewerSettingsDialog(this, mViewerSettings);
+		/*DialogFragment dialog = new ViewerSettingsDialog(this, mViewerSettings);
 		dialog.show(fm, "dialog");
-		fragmentTransaction.commit();
+		fragmentTransaction.commit();*/
 	}
 
 	@Override

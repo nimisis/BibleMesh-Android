@@ -14,7 +14,7 @@ repositories {
 }
 
 dependencies {
-    compile fileTree(dir: '../libs', include: '*.jar')
+    compile fileTree(include: '*.jar', dir: '../libs')
 }
 
 task buildCssAssets(type: Copy) {
@@ -49,5 +49,25 @@ tasks.whenTaskAdded { task ->
         task.dependsOn "buildAssets",
             ":epub3:buildMk"//,
             //"buildEpubReadingSystem"
+    }
+}
+android {
+    signingConfigs {
+        config {
+            keyAlias 'biblemesh'
+            keyPassword 'biblemesh'
+            storeFile file('/Users/admin/Projects/Eclipse/Android/keystore/biblemesh.jks')
+            storePassword 'biblemesh'
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.config
+            debuggable true
+            jniDebuggable true
+        }
+        debug {
+            debuggable true
+        }
     }
 }

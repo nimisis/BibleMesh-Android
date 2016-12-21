@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.readium.sdk.android.biblemesh"
-    android:versionCode="1"
-    android:versionName="0.1.0" >
+    android:versionCode="2"
+    android:versionName="0.1.1" >
 
     <uses-sdk
         android:minSdkVersion="11"
@@ -32,6 +32,13 @@
         <activity
             android:name="org.readium.sdk.android.biblemesh.ContainerList"
             android:label="@string/container_list_title">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <data android:scheme="biblemesh" android:host="read.biblemesh.com"
+                    />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+            </intent-filter>
         </activity>
         <activity
             android:name="org.readium.sdk.android.biblemesh.BookDataActivity"
