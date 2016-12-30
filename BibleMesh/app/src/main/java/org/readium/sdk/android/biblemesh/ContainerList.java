@@ -52,6 +52,9 @@ import android.widget.Toast;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 
+import com.google.analytics.tracking.android.EasyTracker;
+//import com.google.android.gms.analytics.GoogleAnalytics;
+
 /**
  * @author chtian
  * 
@@ -274,4 +277,18 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 		});
         return list;
     }
+
+	@Override
+	protected void onStart() {
+		super.onStart();
+		EasyTracker.getInstance(this).activityStart(this);
+		//GoogleAnalytics.getInstance(this).reportActivityStart(this);
+	}
+
+	@Override
+	protected void onStop() {
+		super.onStop();
+		EasyTracker.getInstance(this).activityStop(this);
+		//GoogleAnalytics.getInstance(this).reportActivityStop(this);
+	}
 }
