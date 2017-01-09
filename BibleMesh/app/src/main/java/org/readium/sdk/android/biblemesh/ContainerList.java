@@ -87,7 +87,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 	    Intent intent = getIntent();
 	    Uri data = intent.getData();
 		if (data != null) {
-			//handle the request
+			//handle the request (consider need to login)
 			List<String> params = data.getPathSegments();
 			String first = params.get(0);
 			String second = params.get(1);

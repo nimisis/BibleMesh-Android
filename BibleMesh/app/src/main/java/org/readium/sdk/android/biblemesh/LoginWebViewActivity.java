@@ -71,5 +71,4 @@ public class LoginWebViewActivity extends Activity {
 
 		//getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 	}
-
 }
