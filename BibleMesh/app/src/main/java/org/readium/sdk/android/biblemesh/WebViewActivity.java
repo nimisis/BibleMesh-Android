@@ -68,8 +68,10 @@ import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
 import android.util.Log;
+import android.view.GestureDetector;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
@@ -204,6 +206,28 @@ public class WebViewActivity extends FragmentActivity implements
 	private boolean mIsMoPlaying;
 	private int mEpubRsoInjectCounter = 0;
 
+	class MyGestureListener extends GestureDetector.SimpleOnGestureListener {
+		private static final String DEBUG_TAG = "Gestures";
+
+		/*@Override
+		public boolean onDown(MotionEvent event) {
+			Log.d(DEBUG_TAG,"onDown: " + event.toString());
+			return false;
+		}*/
+
+		@Override
+		public boolean onFling(MotionEvent event1, MotionEvent event2,
+		                       float velocityX, float velocityY) {
+			//Log.d(DEBUG_TAG, "onFling: " + event1.toString()+event2.toString());
+			if (velocityX > 0) {
+				mReadiumJSApi.openPageLeft();
+			} else {
+				mReadiumJSApi.openPageRight();
+			}
+			return true;
+		}
+	}
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -217,6 +241,16 @@ public class WebViewActivity extends FragmentActivity implements
 
 		mPageInfo = (TextView) findViewById(R.id.page_info);
 		initWebView();
+
+		final GestureDetector gestureDetector = new GestureDetector(this, new MyGestureListener());
+
+		mWebview.setOnTouchListener(new View.OnTouchListener() {
+
+			@Override
+			public boolean onTouch(View v, MotionEvent event) {
+				return gestureDetector.onTouchEvent(event);
+			}
+		});
 
 		Intent intent = getIntent();
 		if (intent.getFlags() == Intent.FLAG_ACTIVITY_NEW_TASK) {
@@ -347,13 +381,13 @@ public class WebViewActivity extends FragmentActivity implements
 		return false;
 	}
 
-	public void onClick(View v) {
+	/*public void onClick(View v) {
 		if (v.getId() == R.id.left) {
 			mReadiumJSApi.openPageLeft();
 		} else if (v.getId() == R.id.right) {
 			mReadiumJSApi.openPageRight();
 		}
-	}
+	}*/
 
 	private void showSettings() {
 		FragmentManager fm = getSupportFragmentManager();
