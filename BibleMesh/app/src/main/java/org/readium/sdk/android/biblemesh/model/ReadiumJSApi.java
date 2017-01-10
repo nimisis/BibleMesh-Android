@@ -46,7 +46,11 @@ public class ReadiumJSApi {
 	public void bookmarkCurrentPage() {
 		loadJS("window.LauncherUI.getBookmarkData(ReadiumSDK.reader.bookmarkCurrentPage());");
 	}
-	
+
+	public void highlightSelection() {
+		loadJS("ReadiumSDK.reader.plugins.highlights.addSelectionHighlight(Math.floor((Math.random()*1000000)), 'highlight');");
+	}
+
 	public void openPageLeft() {
 		loadJS("ReadiumSDK.reader.openPageLeft();");
 	}

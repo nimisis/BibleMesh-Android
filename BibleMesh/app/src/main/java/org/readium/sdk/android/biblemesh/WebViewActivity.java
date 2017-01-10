@@ -316,11 +316,16 @@ public class WebViewActivity extends FragmentActivity implements
 	public boolean onMenuItemSelected(int featureId, MenuItem item) {
 		int itemId = item.getItemId();
 		switch (itemId) {
-		case R.id.add_bookmark:
-			if (!quiet)
-				Log.d(TAG, "Add a bookmark");
-			mReadiumJSApi.bookmarkCurrentPage();
-			return true;
+			case R.id.add_bookmark:
+				if (!quiet)
+					Log.d(TAG, "Add a bookmark");
+				mReadiumJSApi.bookmarkCurrentPage();
+				return true;
+			case R.id.add_highlight:
+				if (!quiet)
+					Log.d(TAG, "Add highlight");
+				mReadiumJSApi.highlightSelection();
+				return true;
 		case R.id.settings:
 			if (!quiet)
 				Log.d(TAG, "Show settings");

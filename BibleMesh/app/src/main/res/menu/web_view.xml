@@ -33,14 +33,20 @@
         android:visible="false" />
     
     <item
-        android:id="@+id/add_bookmark"
+        android:id="@+id/add_highlight"
         android:orderInCategory="100"
         android:showAsAction="ifRoom"
-        android:title="@string/add_bookmark"/>
+        android:title="@string/add_highlight"/>
+
     <item
         android:id="@+id/settings"
         android:orderInCategory="100"
         android:showAsAction="ifRoom"
         android:title="@string/settings"/>
 
+	<item
+		android:id="@+id/add_bookmark"
+		android:orderInCategory="100"
+		android:showAsAction="ifRoom"
+		android:title="@string/add_bookmark"/>
 </menu>
