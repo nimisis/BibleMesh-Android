@@ -27,7 +27,7 @@ android {
             minifyEnabled = false
         }
         release {
-            minifyEnabled = true
+            minifyEnabled = false
         }
     }
 

@@ -3,6 +3,7 @@ if (rootProject.hasProperty("readium_ndk_debug") && rootProject.readium_ndk_debu
     println "${project.name}: Use gradle experimental to build application"
     apply from: 'build_experimental.gradle'
 } else {
+    println "${project.name}: Use gradle stable to build application"
     apply from: 'build_stable.gradle'
 }
 
@@ -64,8 +65,8 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.config
-            debuggable true
-            jniDebuggable true
+            debuggable false
+            jniDebuggable false
         }
         debug {
             debuggable true

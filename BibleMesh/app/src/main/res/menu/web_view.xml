@@ -31,12 +31,6 @@
         android:icon="@drawable/mo_next"
         android:title="@string/menu_mo_next"
         android:visible="false" />
-    
-    <item
-        android:id="@+id/add_highlight"
-        android:orderInCategory="100"
-        android:showAsAction="ifRoom"
-        android:title="@string/add_highlight"/>
 
     <item
         android:id="@+id/settings"
