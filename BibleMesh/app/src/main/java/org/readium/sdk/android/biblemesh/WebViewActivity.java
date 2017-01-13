@@ -788,7 +788,7 @@ public class WebViewActivity extends FragmentActivity implements
 		@JavascriptInterface
 		public void onIsMediaOverlayAvailable(String available) {
 			if (!quiet)
-				Log.d(TAG, "onIsMediaOverlayAvailable:" + available);
+				Log.d(TAG, "onIsMediaOverlayAvailablee:" + available);
 			mIsMoAvailable = available.equals("true");
 
 			runOnUiThread(new Runnable() {
@@ -862,6 +862,34 @@ public class WebViewActivity extends FragmentActivity implements
 					});
 			builder.setNegativeButton(android.R.string.cancel, null);
 			builder.show();
+		}
+
+		@JavascriptInterface
+		public void onAnnotationClicked(String id) {
+			if (!quiet)
+				Log.d(TAG, "onAnnotationClicked:" + id);
+			// this should be real json parsing if there will be more data that
+			// needs to be extracted
+			AlertDialog.Builder builder = new AlertDialog.Builder(
+					WebViewActivity.this)
+					.setTitle("Annotation clicked")
+					.setMessage(id)
+
+			/*final EditText editText = new EditText(WebViewActivity.this);
+			editText.setId(android.R.id.edit);
+			editText.setHint(R.string.title);
+			builder.setView(editText);*/
+				.setPositiveButton(android.R.string.ok,
+					new DialogInterface.OnClickListener() {
+
+						@Override
+						public void onClick(DialogInterface dialog, int which) {
+dialog.dismiss();
+						}
+					});
+			builder.setNegativeButton(android.R.string.cancel, null);
+			builder.show();
+
 		}
 	}
 

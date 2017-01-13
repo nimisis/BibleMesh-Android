@@ -40,8 +40,10 @@ public class MainActivity extends Activity {
         public void handleMessage(Message msg) {
             switch (msg.what) {
             case STOPSPLASH:
+                //Intent intent = new Intent(getApplicationContext(),
+                        //LoginActivity.class);
                 Intent intent = new Intent(getApplicationContext(),
-                        LoginActivity.class);
+                        ContainerList.class);
                 startActivity(intent);
                 MainActivity.this.finish();
                 break;
