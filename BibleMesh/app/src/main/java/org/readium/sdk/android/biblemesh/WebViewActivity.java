@@ -873,7 +873,7 @@ public class WebViewActivity extends FragmentActivity implements
 			mActionMode = mode;
 			Menu menu = mode.getMenu();
 			// Remove the default menu items (select all, copy, paste, search)
-			menu.clear();
+			//menu.clear();
 
 			// If you want to keep any of the defaults,
 			// remove the items you don't want individually:
