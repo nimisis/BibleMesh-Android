@@ -33,10 +33,10 @@ import android.widget.BaseAdapter;
 import android.widget.TextView;
 
 public class BookListAdapter extends BaseAdapter {
-	
+
 	private final List<String> mData;
 	private final Context context;
-	
+
 	public BookListAdapter(Context context, List<String> list) {
 		this.mData = list;
 		this.context = context;
@@ -56,7 +56,7 @@ public class BookListAdapter extends BaseAdapter {
 	public long getItemId(int position) {
 		return position;
 	}
-	
+
 	public View getView(int position, View convertView, ViewGroup parent) {
 		ViewHolder holder = null;
 		if (convertView == null) {
@@ -71,7 +71,7 @@ public class BookListAdapter extends BaseAdapter {
 		holder.text.setText(mData.get(position));
 		return convertView;
 	}
-	
+
 	public final class ViewHolder {
 		public TextView text;
 	}

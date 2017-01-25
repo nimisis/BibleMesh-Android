@@ -50,8 +50,8 @@ public class DBHelper extends SQLiteOpenHelper {
 		// TODO Auto-generated constructor stub
 	}
 
-	public DBCursor getLocations(Integer userID){
-		String sql = "SELECT locations.*, books.title, books.author, books.coverHref, books.rootURL, books.downloadStatus FROM locations left join books on locations.bookID = books.bookID where locations.userID = "+userID.toString()+" order by locations.bookID asc";// + sortBy.toString();
+	public DBCursor getLocations(Integer userID) {
+		String sql = "SELECT locations.*, books.title, books.author, books.coverHref, books.rootURL, books.downloadStatus FROM locations left join books on locations.bookID = books.bookID where locations.userID = " + userID.toString() + " order by locations.bookID asc";// + sortBy.toString();
 		SQLiteDatabase d = getReadableDatabase();
 		DBCursor c = (DBCursor) d.rawQueryWithFactory(
 				new DBCursor.Factory(),
@@ -62,8 +62,8 @@ public class DBHelper extends SQLiteOpenHelper {
 		return c;
 	}
 
-	public DBCursor getBook(Integer bookID){
-		String sql = "SELECT * FROM books where bookID = "+bookID.toString();
+	public DBCursor getBook(Integer bookID) {
+		String sql = "SELECT * FROM books where bookID = " + bookID.toString();
 		SQLiteDatabase d = getReadableDatabase();
 		DBCursor c = (DBCursor) d.rawQueryWithFactory(
 				new DBCursor.Factory(),
@@ -75,7 +75,7 @@ public class DBHelper extends SQLiteOpenHelper {
 	}
 
 	public void InsertLocation(Integer bookID, Integer userID) {
-		String sql = "Insert into locations (id, bookID, userID) values (NULL, "+bookID.toString()+","+userID.toString()+")";
+		String sql = "Insert into locations (id, bookID, userID) values (NULL, " + bookID.toString() + "," + userID.toString() + ")";
 		try {
 			getWritableDatabase().execSQL(sql);
 		} catch (SQLException e) {
@@ -85,7 +85,7 @@ public class DBHelper extends SQLiteOpenHelper {
 
 	public void InsertBook(Integer bookID, String title, String author, String coverHref, String rootURL, String updatedAtStr) {
 		String sql = "Insert into books (id, bookID, title, author, coverHref, rootURL) values " +
-				"(NULL, "+bookID.toString()+",'"+title+"', '"+author+"', '"+coverHref+"', '"+rootURL+"')";
+				"(NULL, " + bookID.toString() + ",'" + title + "', '" + author + "', '" + coverHref + "', '" + rootURL + "')";
 		//fixme test with titles with apostrophes
 		try {
 			getWritableDatabase().execSQL(sql);
