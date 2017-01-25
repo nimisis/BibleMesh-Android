@@ -34,7 +34,9 @@ public class LoginWebViewActivity extends Activity {
 			{
 				String token = cmsg.message();
 				Log.v("authtest", token);
-				if (token.startsWith("sometoken")) {
+				token = token.replace("<pre style=\"word-wrap: break-word; white-space: pre-wrap;\">", "");
+				token = token.replace("</pre>", "");
+				if (token.startsWith("[{")) {
 					Log.v("authtest", "got token, finishing...");
 
 					Bundle conData = new Bundle();
@@ -67,7 +69,7 @@ public class LoginWebViewActivity extends Activity {
 			}
 		});
 
-		mWebview.loadUrl("http://nimisis.com/blogin.php");
+		mWebview.loadUrl("https://read.biblemesh.com/epub_content/epub_library.json");
 
 		//getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 	}
