@@ -78,9 +78,17 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Long> {
 
 			vid[0].downloadStatus = 1;
 			dbHelper.SetDownloadStatus(vid[0].bookID, vid[0].downloadStatus);
-	        try {
+			HttpURLConnection httpConn = null;
+			try {
 		        URL url = new URL("https://read.biblemesh.com/epub_content/book_"+vid[0].bookID.toString()+"/book.epub");
-		        HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+		        httpConn = (HttpURLConnection) url.openConnection();
+		        httpConn.setRequestMethod("GET");
+		        //httpConn.setRequestProperty("Content-length", "0");
+		        //httpConn.setUseCaches(false);
+		        //httpConn.setAllowUserInteraction(false);
+		        //httpConn.setConnectTimeout(timeout);
+		        //httpConn.setReadTimeout(timeout);
+		        httpConn.connect();
 		        int responseCode = httpConn.getResponseCode();
 
 		        // always check HTTP response code first
@@ -104,10 +112,6 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Long> {
 			        FileOutputStream fos = new FileOutputStream(outputFile);
 			        // opens input stream from the HTTP connection
 			        InputStream inputStream = httpConn.getInputStream();
-			        //String saveFilePath = saveDir + File.separator + fileName;
-
-			        // opens an output stream to save into file
-			        //FileOutputStream outputStream = new FileOutputStream(saveFilePath);
 
 			        int bytesRead = -1;
 			        byte[] buffer = new byte[BUFFER_SIZE];
@@ -127,14 +131,15 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Long> {
 			        vid[0].downloadStatus = 0;
 			        System.out.println("No file to download. Server replied HTTP code: " + responseCode);
 		        }
-		        httpConn.disconnect();
 
                 Log.v("doInBackground", "done");
 	        } catch (IOException e) {
             	Log.d("err", "Error: " + e);
 		        vid[0].downloadStatus = 0;
 	        } finally {
-		        //urlConnection.disconnect();
+				if (httpConn != null) {
+					httpConn.disconnect();
+				}
 	        }
 		dbHelper.SetDownloadStatus(vid[0].bookID, vid[0].downloadStatus);
         return totalSize;

@@ -37,13 +37,16 @@ import org.readium.sdk.android.biblemesh.model.BookmarkDatabase;
 import org.readium.sdk.android.SdkErrorHandler;
 import org.readium.sdk.android.biblemesh.model.OpenPageRequest;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.database.SQLException;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -207,8 +210,15 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 						case 1: //TYPE_WIFI
 						case 2: //TYPE_MOBILE
 						{
+
+							if(PackageManager.PERMISSION_GRANTED == checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)){
+								//storageDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "myPhoto");
+
+								new DownloadTask(ContainerList.this, dbHelper).execute(ep);
+							} else {
+								requestPermission(context);
+							}
 							//// FIXME: 25/01/2017 do check about wifi/mobile
-							new DownloadTask(ContainerList.this, dbHelper).execute(ep);
 						}
 
 					}
@@ -219,6 +229,51 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 		// Loads the native lib and sets the path to use for cache
 		Log.v("library", "cache path:"+getCacheDir().getAbsolutePath());
 		EPub3.setCachePath(getCacheDir().getAbsolutePath());
+	}
+
+	final int REQUEST_WRITE_EXTERNAL_STORAGE = 1;
+
+	void requestPermission(final Context context){
+		if(shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+			// Provide an additional rationale to the user if the permission was not granted
+			// and the user would benefit from additional context for the use of the permission.
+			// For example if the user has previously denied the permission.
+
+			new AlertDialog.Builder(context)
+					.setMessage("Please grant storage permission")
+					.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+						@Override
+						public void onClick(DialogInterface dialog, int which) {
+							requestPermissions(
+									new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+									REQUEST_WRITE_EXTERNAL_STORAGE);
+						}
+					}).show();
+
+		} else {
+			// permission has not been granted yet. Request it directly.
+			requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_EXTERNAL_STORAGE);
+		}
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode,String permissions[], int[] grantResults) {
+		switch (requestCode) {
+			case REQUEST_WRITE_EXTERNAL_STORAGE: {
+				if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+					Toast.makeText(context,
+							"Permission granted",
+							Toast.LENGTH_SHORT).show();
+
+				} else {
+					Toast.makeText(context,
+							"Permission denied",
+							Toast.LENGTH_SHORT).show();
+					super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+				}
+				return;
+			}
+		}
 	}
 
 	private Stack<String> m_SdkErrorHandler_Messages = null;
