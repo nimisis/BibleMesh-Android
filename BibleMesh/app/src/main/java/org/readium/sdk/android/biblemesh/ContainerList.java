@@ -40,6 +40,7 @@ import org.readium.sdk.android.biblemesh.model.OpenPageRequest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.database.SQLException;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -53,6 +54,8 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 
 import com.google.analytics.tracking.android.EasyTracker;
+import com.google.analytics.tracking.android.MapBuilder;
+
 //import com.google.android.gms.analytics.GoogleAnalytics;
 
 /**
@@ -60,6 +63,7 @@ import com.google.analytics.tracking.android.EasyTracker;
  */
 public class ContainerList extends Activity implements SdkErrorHandler {
 
+	final private String PATH = Environment.getExternalStorageDirectory() + "/Android/data/org.readium.sdk.android.biblemesh/";
 	protected abstract class SdkErrorHandlerMessagesCompleted {
 		Intent m_intent = null;
 
@@ -78,7 +82,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 	}
 
 	private Context context;
-	private final String testPath = "epubtest";
+	//private final String testPath = "epubtest";
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -101,70 +105,119 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 
 		final ListView view = (ListView) findViewById(R.id.containerList);
 
-		final List<String> list = getInnerBooks();
+		final DBHelper dbHelper = new DBHelper(getApplicationContext());
+		DBCursor cursor = dbHelper.getLocations(LoginActivity.userID);
 
-		BookListAdapter bookListAdapter = new BookListAdapter(this, list);
-		view.setAdapter(bookListAdapter);
-
-		if (list.isEmpty()) {
-			Toast.makeText(
-					context,
-					Environment.getExternalStorageDirectory().getAbsolutePath()
-							+ "/" + testPath
-							+ "/ or /sdcard/" + testPath
-							+ "/ looks empty. Enable Settings > Apps > BibleMesh > Permissions > Storage and copy epub3 test file(s) first please.",
-					Toast.LENGTH_LONG).show();
+		final List<EPubTitle> booksArray = new ArrayList<EPubTitle>();
+		for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
+			cursor.moveToPosition(rowNum);
+			EPubTitle ep = new EPubTitle();
+			ep.downloadStatus = cursor.getColDownloadStatus();
+			ep.bookID = cursor.getColBookID();
+			//reset downloadStatus so it is never stuck in "downloading" phase
+			if (ep.downloadStatus == 1) {
+				ep.downloadStatus = 0;
+				dbHelper.SetDownloadStatus(ep.bookID, 0);
+			}
+			ep.author = cursor.getColAuthor();
+			ep.title = cursor.getColTitle();
+			booksArray.add(ep);
 		}
+
+		BookListAdapter bookListAdapter = new BookListAdapter(this, booksArray);
+		view.setAdapter(bookListAdapter);
 
 		view.setOnItemClickListener(new ListView.OnItemClickListener() {
 
 			@Override
 			public void onItemClick(AdapterView<?> arg0, View arg1, int arg2,
 			                        long arg3) {
+				EPubTitle ep = booksArray.get(arg2);
+				Integer downloadStatus = ep.downloadStatus;//cursor.getColDownloadStatus();
+				Log.v("library", "downloadStatus is " + downloadStatus);
+				Boolean downloadIt = false;
+				switch(downloadStatus) {
+					case 0:
+					case 2:
+						//if file exists, open it
+						String fstr = PATH + "book_"+Integer.toString(ep.bookID)+".epub";
+						File f = new File(fstr);
+						if (f.exists()) {
+							Log.v("library", "file exists");
 
-				String bookName = list.get(arg2);
+							m_SdkErrorHandler_Messages = new Stack<String>();
 
-				String path = Environment.getExternalStorageDirectory().getAbsolutePath() + "/" + testPath + "/" + bookName;
+							EPub3.setSdkErrorHandler(ContainerList.this);
+							Container container = EPub3.openBook(fstr);
+							EPub3.setSdkErrorHandler(null);
 
-				Toast.makeText(context, "Select " + bookName, Toast.LENGTH_SHORT).show();
+							ContainerHolder.getInstance().put(container.getNativePtr(), container);
 
-				m_SdkErrorHandler_Messages = new Stack<String>();
+							//Intent intent = new Intent(getApplicationContext(), BookDataActivity.class);
+							//intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+							//intent.putExtra(Constants.BOOK_NAME, bookName);
+							//intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());
 
-				EPub3.setSdkErrorHandler(ContainerList.this);
-				Container container = EPub3.openBook(path);
-				EPub3.setSdkErrorHandler(null);
+							Intent intent = new Intent(context, WebViewActivity.class);
+							intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+							intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());
+							OpenPageRequest openPageRequest = OpenPageRequest.fromIdrefAndCfi(null, null);
+							try {
+								intent.putExtra(Constants.OPEN_PAGE_REQUEST_DATA, openPageRequest.toJSON().toString());
+								//startActivity(intent);
+							} catch (JSONException e) {
+								Log.e("Biblemesh", "" + e.getMessage(), e);
+							}
 
-				ContainerHolder.getInstance().put(container.getNativePtr(), container);
+							SdkErrorHandlerMessagesCompleted callback = new SdkErrorHandlerMessagesCompleted(intent) {
+								@Override
+								public void once() {
+									startActivity(m_intent);
+								}
+							};
 
-                /*Intent intent = new Intent(getApplicationContext(), BookDataActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                intent.putExtra(Constants.BOOK_NAME, bookName);
-                intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());*/
+							// async!
+							popSdkErrorHandlerMessage(context, callback);
 
-				Intent intent = new Intent(context, WebViewActivity.class);
-				intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());
-				OpenPageRequest openPageRequest = OpenPageRequest.fromIdrefAndCfi(null, null);
-				try {
-					intent.putExtra(Constants.OPEN_PAGE_REQUEST_DATA, openPageRequest.toJSON().toString());
-					//startActivity(intent);
-				} catch (JSONException e) {
-					Log.e("Biblemesh", "" + e.getMessage(), e);
+						} else {//otherwise download it
+							Log.v("library", "download it");
+							downloadIt = true;
+						}
+						break;
+					case 1:
+						//download in progress
+						Log.v("library", "download in progress");
+						break;
+					default:
+						//assert
+						break;
 				}
 
-				SdkErrorHandlerMessagesCompleted callback = new SdkErrorHandlerMessagesCompleted(intent) {
-					@Override
-					public void once() {
-						startActivity(m_intent);
-					}
-				};
+				if (downloadIt) {
+					//check internet connection status
+					//if not connected, alert
+					//else start download
+					switch (NetworkUtil.getConnectivityStatus(context)) {
+						case 0://TYPE_NOT_CONNECTED
+						{
+							//// FIXME: 25/01/2017
+							Log.v("library", "Not connected");
+						}
+						break;
+						case 1: //TYPE_WIFI
+						case 2: //TYPE_MOBILE
+						{
+							//// FIXME: 25/01/2017 do check about wifi/mobile
+							new DownloadTask(ContainerList.this, dbHelper).execute(ep);
+						}
 
-				// async!
-				popSdkErrorHandlerMessage(context, callback);
+					}
+				}
 			}
 		});
 
 		// Loads the native lib and sets the path to use for cache
+		Log.v("library", "cache path:"+getCacheDir().getAbsolutePath());
 		EPub3.setCachePath(getCacheDir().getAbsolutePath());
 	}
 
@@ -245,37 +298,6 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 
 		// never throws an exception
 		return true;
-	}
-
-	// get books in /sdcard/epubtest path
-	private List<String> getInnerBooks() {
-		List<String> list = new ArrayList<String>();
-		File sdcard = Environment.getExternalStorageDirectory();
-		File epubpath = new File(sdcard, "epubtest");
-		epubpath.mkdirs();
-		File[] files = epubpath.listFiles();
-		if (files != null) {
-			for (File f : files) {
-				if (f.isFile()) {
-					String name = f.getName();
-					if (name.length() > 5
-							&& name.substring(name.length() - 5).equals(".epub")) {
-
-						list.add(name);
-						Log.i("books", name);
-					}
-				}
-			}
-		}
-		Collections.sort(list, new Comparator<String>() {
-
-			@Override
-			public int compare(String s1, String s2) {
-				return s1.compareToIgnoreCase(s2);
-			}
-
-		});
-		return list;
 	}
 
 	@Override

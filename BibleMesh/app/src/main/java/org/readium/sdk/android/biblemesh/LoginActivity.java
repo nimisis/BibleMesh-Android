@@ -16,7 +16,7 @@ import org.json.JSONObject;
 
 public class LoginActivity extends Activity {
 
-	public Integer userID;
+	static public Integer userID;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {

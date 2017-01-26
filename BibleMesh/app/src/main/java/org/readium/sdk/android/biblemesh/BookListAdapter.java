@@ -34,10 +34,10 @@ import android.widget.TextView;
 
 public class BookListAdapter extends BaseAdapter {
 
-	private final List<String> mData;
+	private final List<EPubTitle> mData;
 	private final Context context;
 
-	public BookListAdapter(Context context, List<String> list) {
+	public BookListAdapter(Context context, List<EPubTitle> list) {
 		this.mData = list;
 		this.context = context;
 	}
@@ -68,7 +68,7 @@ public class BookListAdapter extends BaseAdapter {
 		} else {
 			holder = (ViewHolder) convertView.getTag();
 		}
-		holder.text.setText(mData.get(position));
+		holder.text.setText(mData.get(position).title + mData.get(position).author);
 		return convertView;
 	}
 

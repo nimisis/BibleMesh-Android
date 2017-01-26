@@ -74,6 +74,15 @@ public class DBHelper extends SQLiteOpenHelper {
 		return c;
 	}
 
+	public void SetDownloadStatus(Integer bookID, Integer status) {
+		String sql = "UPDATE books set downloadStatus = " +status+" where bookID = " + bookID.toString();
+		try {
+			getWritableDatabase().execSQL(sql);
+		} catch (SQLException e) {
+			Log.e("Error setting download status", e.toString());
+		}
+	}
+
 	public void InsertLocation(Integer bookID, Integer userID) {
 		String sql = "Insert into locations (id, bookID, userID) values (NULL, " + bookID.toString() + "," + userID.toString() + ")";
 		try {

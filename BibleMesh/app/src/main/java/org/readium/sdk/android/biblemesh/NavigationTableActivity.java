@@ -87,7 +87,8 @@ public abstract class NavigationTableActivity extends Activity {
 	protected abstract NavigationTable getNavigationTable();
 
     protected void setListViewContent(ListView view, final NavigationTable navigationTable) {
-    	List<String> list = flatNavigationTable(navigationTable, new ArrayList<String>(), "");
+    	//dhb
+	    /*List<String> list = flatNavigationTable(navigationTable, new ArrayList<String>(), "");
     	final List<NavigationElement> navigationElements = flatNavigationTable(navigationTable, new ArrayList<NavigationElement>());
         BookListAdapter bookListAdapter = new BookListAdapter(this, list);
         view.setAdapter(bookListAdapter);
@@ -114,7 +115,7 @@ public abstract class NavigationTableActivity extends Activity {
                 Toast.makeText(context, "this is item " + navigation.getTitle(),
                         Toast.LENGTH_SHORT).show();
             }
-        });
+        });*/
     }
 
     private List<String> flatNavigationTable(NavigationElement parent,

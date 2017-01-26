@@ -88,7 +88,8 @@ public class SpineItemsActivity extends Activity {
     }
 
     private void setListViewContent(ListView view, final List<SpineItem> spineItems) {
-    	final List<String> list = new ArrayList<String>();
+    	//dhb
+	    /*final List<String> list = new ArrayList<String>();
     	for (SpineItem si : spineItems) {
 			list.add(si.getIdRef());
 		}
@@ -113,7 +114,7 @@ public class SpineItemsActivity extends Activity {
 					Log.e(TAG, ""+e.getMessage(), e);
 				}
             }
-        });
+        });*/
     }
 
     private void initListener() {

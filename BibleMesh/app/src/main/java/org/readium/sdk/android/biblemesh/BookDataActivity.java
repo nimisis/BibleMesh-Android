@@ -108,7 +108,8 @@ public class BookDataActivity extends Activity {
 	}
 
 	private void setListViewContent(ListView view, String[] stringArray, final Class<?>[] classes) {
-		BookListAdapter bookListAdapter = new BookListAdapter(this, Arrays.asList(stringArray));
+		//dhb
+		/*BookListAdapter bookListAdapter = new BookListAdapter(this, Arrays.asList(stringArray));
 		view.setAdapter(bookListAdapter);
 		view.setOnItemClickListener(new ListView.OnItemClickListener() {
 
@@ -122,7 +123,7 @@ public class BookDataActivity extends Activity {
 
 				startActivity(intent);
 			}
-		});
+		});*/
 	}
 
 	@Override
