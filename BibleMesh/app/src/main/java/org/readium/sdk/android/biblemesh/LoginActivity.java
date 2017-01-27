@@ -17,6 +17,7 @@ import org.json.JSONObject;
 public class LoginActivity extends Activity {
 
 	static public Integer userID;
+	//public LLocation llocation;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -26,6 +27,7 @@ public class LoginActivity extends Activity {
 		//setSupportActionBar(toolbar);
 
 		userID = 1;
+//		//llocation = new LLocation();
 	}
 
 	public void login(View view) {
@@ -92,6 +94,7 @@ public class LoginActivity extends Activity {
 						insertNew = true;
 					}
 					if (insertNew) {
+
 						Log.v("db", "inserting new location");
 						dbHelper.InsertLocation(bookID, userID);
 						//search books for this bookid

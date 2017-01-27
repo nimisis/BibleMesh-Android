@@ -6,6 +6,8 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
+import java.math.BigInteger;
+
 /**
  * Created by admin on 28/11/2016.
  */
@@ -62,6 +64,30 @@ public class DBHelper extends SQLiteOpenHelper {
 		return c;
 	}
 
+	public DBCursor getLocation(Integer userID, Integer bookID) {
+		String sql = "SELECT locations.* FROM locations where locations.bookID = "+bookID+" and locations.userID = " + userID.toString();// + sortBy.toString();
+		SQLiteDatabase d = getReadableDatabase();
+		DBCursor c = (DBCursor) d.rawQueryWithFactory(
+				new DBCursor.Factory(),
+				sql,
+				null,
+				null);
+		c.moveToFirst();
+		return c;
+	}
+
+	public DBCursor getHighlights(Integer userID, Integer bookID) {
+		String sql = "SELECT highlights.* FROM highlights where highlights.userID = " + userID.toString() + " and highlights.bookID = "+bookID.toString()+" order by highlights.cfi asc";
+		SQLiteDatabase d = getReadableDatabase();
+		DBCursor c = (DBCursor) d.rawQueryWithFactory(
+				new DBCursor.Factory(),
+				sql,
+				null,
+				null);
+		c.moveToFirst();
+		return c;
+	}
+
 	public DBCursor getBook(Integer bookID) {
 		String sql = "SELECT * FROM books where bookID = " + bookID.toString();
 		SQLiteDatabase d = getReadableDatabase();
@@ -74,12 +100,21 @@ public class DBHelper extends SQLiteOpenHelper {
 		return c;
 	}
 
+	public void setLocation(Integer bookID, String idref, String elementCfi, Long updated_at) {
+		String sql = "UPDATE locations set idref = '" +idref+"', elementCfi = '"+elementCfi+"', lastUpdated = "+updated_at+" where bookID = " + bookID.toString();
+		try {
+			getWritableDatabase().execSQL(sql);
+		} catch (SQLException e) {
+			Log.e("Error setting location", e.toString());
+		}
+	}
+
 	public void SetDownloadStatus(Integer bookID, Integer status) {
 		String sql = "UPDATE books set downloadStatus = " +status+" where bookID = " + bookID.toString();
 		try {
 			getWritableDatabase().execSQL(sql);
 		} catch (SQLException e) {
-			Log.e("Error setting download status", e.toString());
+			Log.e("Error setting dstatus", e.toString());
 		}
 	}
 

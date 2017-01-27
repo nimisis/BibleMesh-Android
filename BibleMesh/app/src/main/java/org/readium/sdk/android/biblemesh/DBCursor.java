@@ -6,6 +6,8 @@ import android.database.sqlite.SQLiteCursorDriver;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQuery;
 
+import java.math.BigInteger;
+
 /**
  * Created by admin on 28/11/2016.
  */
@@ -35,6 +37,15 @@ public class DBCursor extends SQLiteCursor {
 	}
 	public String getColTitle() {
 		return getString(getColumnIndexOrThrow("title"));
+	}
+	public String getColElementCFI() {
+		return getString(getColumnIndexOrThrow("elementCfi"));
+	}
+	public String getColIDRef() {
+		return getString(getColumnIndexOrThrow("idref"));
+	}
+	public Long getColLastUpdated() {
+		return getLong(getColumnIndexOrThrow("lastUpdated"));
 	}
 	public String getColAuthor() {
 		return getString(getColumnIndexOrThrow("author"));

@@ -148,39 +148,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 						if (f.exists()) {
 							Log.v("library", "file exists");
 
-							m_SdkErrorHandler_Messages = new Stack<String>();
-
-							EPub3.setSdkErrorHandler(ContainerList.this);
-							Container container = EPub3.openBook(fstr);
-							EPub3.setSdkErrorHandler(null);
-
-							ContainerHolder.getInstance().put(container.getNativePtr(), container);
-
-							//Intent intent = new Intent(getApplicationContext(), BookDataActivity.class);
-							//intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-							//intent.putExtra(Constants.BOOK_NAME, bookName);
-							//intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());
-
-							Intent intent = new Intent(context, WebViewActivity.class);
-							intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-							intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());
-							OpenPageRequest openPageRequest = OpenPageRequest.fromIdrefAndCfi(null, null);
-							try {
-								intent.putExtra(Constants.OPEN_PAGE_REQUEST_DATA, openPageRequest.toJSON().toString());
-								//startActivity(intent);
-							} catch (JSONException e) {
-								Log.e("Biblemesh", "" + e.getMessage(), e);
-							}
-
-							SdkErrorHandlerMessagesCompleted callback = new SdkErrorHandlerMessagesCompleted(intent) {
-								@Override
-								public void once() {
-									startActivity(m_intent);
-								}
-							};
-
-							// async!
-							popSdkErrorHandlerMessage(context, callback);
+							refreshData(dbHelper, ep, fstr);
 
 						} else {//otherwise download it
 							Log.v("library", "download it");
@@ -229,6 +197,14 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 		// Loads the native lib and sets the path to use for cache
 		Log.v("library", "cache path:"+getCacheDir().getAbsolutePath());
 		EPub3.setCachePath(getCacheDir().getAbsolutePath());
+	}
+
+	void refreshData(DBHelper dbHelper, EPubTitle ep, String fstr) {
+		//DBHelper dbHelper = new DBHelper(getApplicationContext());
+		DBCursor cursor = dbHelper.getHighlights(LoginActivity.userID, ep.bookID);
+
+		new GetBookDataTask(ContainerList.this, dbHelper, fstr).execute(ep);
+
 	}
 
 	final int REQUEST_WRITE_EXTERNAL_STORAGE = 1;
@@ -368,4 +344,42 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 		EasyTracker.getInstance(this).activityStop(this);
 		//GoogleAnalytics.getInstance(this).reportActivityStop(this);
 	}
+
+	void openBook(String fstr, String idref, String cfi) {
+		m_SdkErrorHandler_Messages = new Stack<String>();
+
+		EPub3.setSdkErrorHandler(ContainerList.this);
+		Container container = EPub3.openBook(fstr);
+		EPub3.setSdkErrorHandler(null);
+
+		ContainerHolder.getInstance().put(container.getNativePtr(), container);
+
+		//Intent intent = new Intent(getApplicationContext(), BookDataActivity.class);
+		//intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		//intent.putExtra(Constants.BOOK_NAME, bookName);
+		//intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());
+
+		Intent intent = new Intent(context, WebViewActivity.class);
+		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		intent.putExtra(Constants.CONTAINER_ID, container.getNativePtr());
+		Log.v("task2", "idref:"+idref+" cfi:"+cfi);
+		OpenPageRequest openPageRequest = OpenPageRequest.fromIdrefAndCfi(idref, cfi);
+		try {
+			intent.putExtra(Constants.OPEN_PAGE_REQUEST_DATA, openPageRequest.toJSON().toString());
+			//startActivity(intent);
+		} catch (JSONException e) {
+			Log.e("Biblemesh", "" + e.getMessage(), e);
+		}
+
+		SdkErrorHandlerMessagesCompleted callback = new SdkErrorHandlerMessagesCompleted(intent) {
+			@Override
+			public void once() {
+				startActivity(m_intent);
+			}
+		};
+
+		// async!
+		popSdkErrorHandlerMessage(context, callback);
+	}
+
 }
