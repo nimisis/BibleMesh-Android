@@ -1,6 +1,7 @@
 package org.readium.sdk.android.biblemesh;
 
 import android.content.Context;
+import android.content.Intent;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
@@ -100,8 +101,28 @@ public class DBHelper extends SQLiteOpenHelper {
 		return c;
 	}
 
+	public void removeHighlights(Integer bookID) {
+		String sql = "DELETE from highlights where bookID = "+bookID.toString()+" and userID = "+LoginActivity.userID.toString();
+		try {
+			getWritableDatabase().execSQL(sql);
+		} catch (SQLException e) {
+			Log.e("removing highlights", e.toString());
+		}
+	}
+
+	public void insertHighlight(Integer bookID, String cfi, Integer color, String note, Long hupdated_at) {
+		String idref = "";
+		String sql = "INSERT into highlights (id, bookID, userID, cfi, idref, color, note, lastUpdated) values " +
+				"(NULL, "+bookID.toString()+", "+LoginActivity.userID.toString()+", '"+cfi+"', '"+idref+"', "+color.toString()+", '"+note+"', "+hupdated_at.toString()+")";
+		try {
+			getWritableDatabase().execSQL(sql);
+		} catch (SQLException e) {
+			Log.e("inserting highlight", e.toString());
+		}
+	}
+
 	public void setLocation(Integer bookID, String idref, String elementCfi, Long updated_at) {
-		String sql = "UPDATE locations set idref = '" +idref+"', elementCfi = '"+elementCfi+"', lastUpdated = "+updated_at+" where bookID = " + bookID.toString();
+		String sql = "UPDATE locations set idref = '" +idref+"', elementCfi = '"+elementCfi+"', lastUpdated = "+updated_at+" where bookID = " + bookID.toString()+" and userID = "+LoginActivity.userID;
 		try {
 			getWritableDatabase().execSQL(sql);
 		} catch (SQLException e) {

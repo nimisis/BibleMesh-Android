@@ -29,15 +29,24 @@
 
 package org.readium.sdk.android.biblemesh;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
+import java.security.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.readium.sdk.android.Container;
@@ -634,7 +643,6 @@ public class WebViewActivity extends FragmentActivity implements
 	}
 
 	private String cleanResourceUrl(String url, boolean preserveQueryFragment) {
-
 		String cleanUrl = null;
 
 		String httpUrl = "http://" + EpubServer.HTTP_HOST + ":"
@@ -671,7 +679,6 @@ public class WebViewActivity extends FragmentActivity implements
 				cleanUrl = cleanUrl.substring(0, indexOfSharp);
 			}
 		}
-
 		return cleanUrl;
 	}
 
@@ -721,7 +728,7 @@ public class WebViewActivity extends FragmentActivity implements
 		@JavascriptInterface
 		public void onPaginationChanged(String currentPagesInfo) {
 			if (!quiet)
-				Log.d(TAG, "onPaginationChanged: " + currentPagesInfo);
+				Log.d(TAG, "onPaginationChanged1: " + currentPagesInfo);
 			try {
 				PaginationInfo paginationInfo = PaginationInfo
 						.fromJson(currentPagesInfo);
@@ -741,6 +748,9 @@ public class WebViewActivity extends FragmentActivity implements
 									isFixedLayout);
 							mWebview.getSettings()
 									.setDisplayZoomControls(false);
+
+							mReadiumJSApi.updateLocation();
+							updateHighlights(page.getIdref());
 						}
 					});
 				}
@@ -770,7 +780,6 @@ public class WebViewActivity extends FragmentActivity implements
                             mOpenPageRequestData);
                 }
             });
-
 		}
 
 		@JavascriptInterface
@@ -828,6 +837,134 @@ public class WebViewActivity extends FragmentActivity implements
 		// public void onMediaOverlayTTSStop() {
 		// Log.d(TAG, "onMediaOverlayTTSStop");
 		// }
+
+		@JavascriptInterface
+		public void updateLocation(final String bookmarkData) {
+			if (!quiet)
+				Log.d(TAG, "updateHighlights:" + bookmarkData);
+
+			try {
+				JSONObject bookmarkJson = new JSONObject(
+						bookmarkData);
+
+				bookmarkJson.getString("idref");
+				bookmarkJson.getString("contentCFI");
+
+				String ts1= new SimpleDateFormat("HH:mm:ss").format(new Date());
+				Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;//// FIXME: 29/01/2017
+				String ts2 = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTime());
+
+				//update local values
+				DBHelper dbHelper = new DBHelper(WebViewActivity.this);
+				dbHelper.setLocation(1, bookmarkJson.getString("idref"), bookmarkJson
+								.getString("contentCFI"), unixtime);
+
+				//Long unixtime = System.currentTimeMillis();//// FIXME: 29/01/2017 time sent seems to be overwritten
+
+				Log.v("webview", "unix:"+unixtime+ "ts:"+ts1+" ts2:"+ts2);
+
+				HttpURLConnection httpConn = null;
+				try {
+					JSONObject postDict = new JSONObject();
+					JSONObject latest_location = new JSONObject();
+					latest_location.put("idref", bookmarkJson.getString("idref"));
+					latest_location.put("elementCFI", bookmarkJson.getString("contentCFI"));
+					String locStr = latest_location.toString();
+					String locStr2 = locStr.replace("\\/", "/");
+					postDict.put("latest_location", locStr2);
+					postDict.put("updated_at", unixtime);
+					JSONArray highlights = new JSONArray();
+					postDict.put("highlights", highlights);
+					String patch = postDict.toString();
+					String patch2 = patch.replace("\\/", "/");
+					URL url = new URL("https://read.biblemesh.com/users/"+LoginActivity.userID+"/books/1.json");
+					httpConn = (HttpURLConnection) url.openConnection();
+					httpConn.setDoOutput(true);
+					httpConn.setRequestMethod("PATCH");
+					httpConn.setRequestProperty("Accept", "application/json");
+					httpConn.setRequestProperty("Content-Type", "application/json");
+					Integer len = patch2.length();
+					httpConn.setRequestProperty("Content-Length", len.toString());
+					//httpConn.setUseCaches(false);
+					//httpConn.setAllowUserInteraction(false);
+					//httpConn.setConnectTimeout(timeout);
+					//httpConn.setReadTimeout(timeout);
+					httpConn.connect();
+
+					OutputStream os = httpConn.getOutputStream();
+					os.write(patch2.getBytes());
+					os.flush();
+
+					int responseCode = httpConn.getResponseCode();
+
+					Log.v("webview", "Response: "+responseCode);
+
+					// always check HTTP response code first
+					if (responseCode == HttpURLConnection.HTTP_OK) {
+						BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream()));
+						StringBuilder sb = new StringBuilder();
+						String line;
+						while ((line = br.readLine()) != null) {
+							sb.append(line + "\n");
+						}
+						br.close();
+						Log.v("webview", "update response:"+sb.toString());
+					} else if (responseCode == 412) {
+						Log.v("webview", "got 412");
+					} else {
+						System.out.println("Server replied HTTP code: " + responseCode);
+					}
+				} catch (IOException e) {
+					Log.d("err", "Error: " + e);
+					//vid[0].downloadStatus = 0;
+				} catch (JSONException e) {
+					Log.v("json", e.getMessage());
+				} finally {
+					if (httpConn != null) {
+						httpConn.disconnect();
+					}
+				}
+			} catch (JSONException e) {
+				Log.e(TAG, "" + e.getMessage(), e);
+			}
+		}
+
+		@JavascriptInterface
+		public void updateHighlights(final String idref) {//fix could have more than one idref
+			if (!quiet)
+				Log.d(TAG, "updateLocation:" + idref);
+
+			//// FIXME: 29/01/2017 runOnUiThread?
+			mReadiumJSApi.removeHighlights(idref);
+		}
+
+		@JavascriptInterface
+		public void removeHighlights(final String response, final String idref) {
+			if (!quiet)
+				Log.d(TAG, "removeHighlights:" + response);
+
+			runOnUiThread(new Runnable() {
+				@Override
+				public void run() {
+					DBHelper dbHelper = new DBHelper(WebViewActivity.this);
+					DBCursor cursor = dbHelper.getHighlights(LoginActivity.userID, 1);//// FIXME: 29/01/2017
+					for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
+						cursor.moveToPosition(rowNum);
+						//fixme when have idrefs for highlights, compare first
+						mReadiumJSApi.addHighlight(idref, cursor.getColCFI());
+						/*if (idref.equals(cursor.getColIDRef())) {
+							mReadiumJSApi.addHighlight(cursor.getColIDRef(), cursor.getColCFI());
+						}*/
+					}
+				}
+			});
+		}
+
+		@JavascriptInterface
+		public void addHighlight(final String response) {
+			if (!quiet)
+				Log.d(TAG, "addHighlight:" + response);
+		}
 
 		@JavascriptInterface
 		public void getBookmarkData(final String bookmarkData) {

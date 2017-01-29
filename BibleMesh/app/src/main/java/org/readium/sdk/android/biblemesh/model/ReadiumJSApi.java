@@ -47,6 +47,18 @@ public class ReadiumJSApi {
 		loadJS("window.LauncherUI.getBookmarkData(ReadiumSDK.reader.bookmarkCurrentPage());");
 	}
 
+	public void updateLocation() {
+		loadJS("window.LauncherUI.updateLocation(ReadiumSDK.reader.bookmarkCurrentPage());");
+	}
+
+	public void removeHighlights(String idref) {
+		loadJS("window.LauncherUI.removeHighlights(ReadiumSDK.reader.plugins.highlights.removeHighlightsByType('highlight'), '"+idref+"');");
+	}
+
+	public void addHighlight(String idref, String cfi) {
+		loadJS("window.LauncherUI.addHighlight(ReadiumSDK.reader.plugins.highlights.addHighlight('"+idref+"', '"+cfi+"', Math.floor((Math.random()*1000000)), 'highlight'));");
+	}
+
 	public void highlightSelection() {
 		loadJS("ReadiumSDK.reader.plugins.highlights.addSelectionHighlight(Math.floor((Math.random()*1000000)), 'highlight');");
 	}

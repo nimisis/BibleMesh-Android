@@ -74,6 +74,8 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 			idref = cursor.getColIDRef();
 			cfi = cursor.getColElementCFI();
 
+			//DBCursor c = dbHelper.getHighlights(vid[0].bookID, LoginActivity.userID);
+			//Log.v("background" , "num highlights:"+ c.getCount());
 			try {
 		        URL url = new URL("https://read.biblemesh.com/users/"+LoginActivity.userID+"/books/"+vid[0].bookID.toString()+".json");
 		        httpConn = (HttpURLConnection) url.openConnection();
@@ -108,24 +110,24 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 			        JSONObject jsonlobject = new JSONObject(latest_location);
 			        String sidref = jsonlobject.getString("idref");
 			        String selementCfi = jsonlobject.getString("elementCfi");
-			        //Integer updated_at1 = jsonobject.getInt("updated_at");
 			        Long updated_at = jsonobject.getLong("updated_at");
-			        JSONArray jArray = jsonobject.getJSONArray("highlights");
-				        for (int i = 0; i < jArray.length(); i++) {
-					        JSONObject jsonhobject = jArray.getJSONObject(i);
-					        String cfi = jsonhobject.getString("cfi");
-					        Integer color = jsonhobject.getInt("color");
-					        String note = jsonhobject.getString("note");
-					        Long hupdated_at = jsonhobject.getLong("updated_at");
-				        }
 
-			        //DBCursor cursor = dbHelper.get
-			        Long bi = cursor.getColLastUpdated();
+			        //fixme not sure about this logic
 					if (updated_at > cursor.getColLastUpdated()) {
 						Log.v("getbook", "server is newer");
 						//remove highlights
+						dbHelper.removeHighlights(vid[0].bookID);
 
 						//insert highlights
+						JSONArray jArray = jsonobject.getJSONArray("highlights");
+						for (int i = 0; i < jArray.length(); i++) {
+							JSONObject jsonhobject = jArray.getJSONObject(i);
+							String cfi = jsonhobject.getString("cfi");
+							Integer color = jsonhobject.getInt("color");
+							String note = jsonhobject.getString("note");
+							Long hupdated_at = jsonhobject.getLong("updated_at");
+							dbHelper.insertHighlight(vid[0].bookID, cfi, color, note, hupdated_at);
+						}
 
 						idref = sidref;
 						cfi = selementCfi;
@@ -133,8 +135,6 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 					} else {
 						Log.v("getbook", "use local data");
 					}
-
-
 
 		        } else {
 			        System.out.println("No file to download. Server replied HTTP code: " + responseCode);
@@ -151,7 +151,6 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 					httpConn.disconnect();
 				}
 	        }
-		//dbHelper.SetDownloadStatus(vid[0].bookID, vid[0].downloadStatus);
         return totalSize;
     }
 

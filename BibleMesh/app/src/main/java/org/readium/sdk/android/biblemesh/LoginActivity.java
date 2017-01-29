@@ -14,9 +14,19 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Calendar;
+import java.util.TimeZone;
+
 public class LoginActivity extends Activity {
 
 	static public Integer userID;
+	static public Long serverTimeOffset;
 	//public LLocation llocation;
 
 	@Override
@@ -27,6 +37,7 @@ public class LoginActivity extends Activity {
 		//setSupportActionBar(toolbar);
 
 		userID = 1;
+		serverTimeOffset = 0L;
 //		//llocation = new LLocation();
 	}
 
@@ -118,10 +129,8 @@ public class LoginActivity extends Activity {
 				Log.v("json", e.getMessage());
 			}
 
-			//// FIXME: 03/01/2017 still need to request titles
-			Intent intent = new Intent(getApplicationContext(),
-					ContainerList.class);
-			startActivity(intent);
+			Integer dummy = 1;
+			new ServerTimeTask(LoginActivity.this).execute(dummy);
 		}
 	}
 }
