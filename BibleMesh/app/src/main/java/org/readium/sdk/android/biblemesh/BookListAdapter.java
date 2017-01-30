@@ -30,6 +30,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 public class BookListAdapter extends BaseAdapter {
@@ -62,17 +63,21 @@ public class BookListAdapter extends BaseAdapter {
 		if (convertView == null) {
 			holder = new ViewHolder();
 			convertView = LayoutInflater.from(context).inflate(
-					android.R.layout.simple_list_item_1, null);
-			holder.text = (TextView) convertView.findViewById(android.R.id.text1);
+					R.layout.listbooks, null);
+			holder.title = (TextView) convertView.findViewById(R.id.title);
+			holder.author = (TextView) convertView.findViewById(R.id.author);
 			convertView.setTag(holder);
 		} else {
 			holder = (ViewHolder) convertView.getTag();
 		}
-		holder.text.setText(mData.get(position).title + mData.get(position).author);
+		holder.title.setText(mData.get(position).title);
+		holder.author.setText(mData.get(position).author);
 		return convertView;
 	}
 
 	public final class ViewHolder {
-		public TextView text;
+		protected TextView title;
+		protected TextView author;
+		protected ImageView cover;
 	}
 }

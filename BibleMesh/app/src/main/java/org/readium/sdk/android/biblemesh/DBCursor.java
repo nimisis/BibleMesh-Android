@@ -38,6 +38,9 @@ public class DBCursor extends SQLiteCursor {
 	public String getColTitle() {
 		return getString(getColumnIndexOrThrow("title"));
 	}
+	public String getColCoverHref() {
+		return getString(getColumnIndexOrThrow("coverHref"));
+	}
 	public String getColElementCFI() {
 		return getString(getColumnIndexOrThrow("elementCfi"));
 	}

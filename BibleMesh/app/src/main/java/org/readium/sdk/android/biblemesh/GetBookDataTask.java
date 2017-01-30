@@ -32,7 +32,7 @@ import org.readium.sdk.android.SdkErrorHandler;
 import org.readium.sdk.android.biblemesh.model.OpenPageRequest;
 
 public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
-	
+
 	private ContainerList activity;
 	private DBHelper dbHelper;
 	private String fstr;

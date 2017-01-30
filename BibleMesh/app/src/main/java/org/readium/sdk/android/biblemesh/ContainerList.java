@@ -124,10 +124,11 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 			}
 			ep.author = cursor.getColAuthor();
 			ep.title = cursor.getColTitle();
+			ep.coverHref = cursor.getColCoverHref();
 			booksArray.add(ep);
 		}
 
-		BookListAdapter bookListAdapter = new BookListAdapter(this, booksArray);
+		BookAdapter bookListAdapter = new BookAdapter(this, booksArray, R.layout.container_list);
 		view.setAdapter(bookListAdapter);
 
 		view.setOnItemClickListener(new ListView.OnItemClickListener() {

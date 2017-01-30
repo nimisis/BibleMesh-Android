@@ -1,5 +1,7 @@
 package org.readium.sdk.android.biblemesh;
 
+import android.graphics.Bitmap;
+
 public class EPubTitle {
 
 	public Integer bookID;
@@ -8,9 +10,11 @@ public class EPubTitle {
 	public String title;
 	public String coverHref;
 	public String rootURL;
-	//public Integer expectedSize;
+	public Bitmap cover;
 
 	public EPubTitle() {
 		downloadStatus = 0;
+		cover = null;
+		coverHref = "";
 	}
 }
