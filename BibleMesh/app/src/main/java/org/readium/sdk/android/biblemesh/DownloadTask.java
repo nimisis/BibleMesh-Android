@@ -77,7 +77,7 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Long> {
         long totalSize = 0;
 
 			vid[0].downloadStatus = 1;
-			dbHelper.SetDownloadStatus(vid[0].bookID, vid[0].downloadStatus);
+			dbHelper.setDownloadStatus(vid[0].bookID, vid[0].downloadStatus);
 			HttpURLConnection httpConn = null;
 			try {
 		        URL url = new URL("https://read.biblemesh.com/epub_content/book_"+vid[0].bookID.toString()+"/book.epub");
@@ -141,7 +141,7 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Long> {
 					httpConn.disconnect();
 				}
 	        }
-		dbHelper.SetDownloadStatus(vid[0].bookID, vid[0].downloadStatus);
+		dbHelper.setDownloadStatus(vid[0].bookID, vid[0].downloadStatus);
         return totalSize;
     }
 

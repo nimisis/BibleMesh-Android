@@ -110,8 +110,7 @@ public class DBHelper extends SQLiteOpenHelper {
 		}
 	}
 
-	public void insertHighlight(Integer bookID, String cfi, Integer color, String note, Long hupdated_at) {
-		String idref = "";
+	public void insertHighlight(Integer bookID, String idref, String cfi, Integer color, String note, Long hupdated_at) {
 		String sql = "INSERT into highlights (id, bookID, userID, cfi, idref, color, note, lastUpdated) values " +
 				"(NULL, "+bookID.toString()+", "+LoginActivity.userID.toString()+", '"+cfi+"', '"+idref+"', "+color.toString()+", '"+note+"', "+hupdated_at.toString()+")";
 		try {
@@ -130,7 +129,7 @@ public class DBHelper extends SQLiteOpenHelper {
 		}
 	}
 
-	public void SetDownloadStatus(Integer bookID, Integer status) {
+	public void setDownloadStatus(Integer bookID, Integer status) {
 		String sql = "UPDATE books set downloadStatus = " +status+" where bookID = " + bookID.toString();
 		try {
 			getWritableDatabase().execSQL(sql);
@@ -139,7 +138,7 @@ public class DBHelper extends SQLiteOpenHelper {
 		}
 	}
 
-	public void InsertLocation(Integer bookID, Integer userID) {
+	public void insertLocation(Integer bookID, Integer userID) {
 		String sql = "Insert into locations (id, bookID, userID) values (NULL, " + bookID.toString() + "," + userID.toString() + ")";
 		try {
 			getWritableDatabase().execSQL(sql);
@@ -148,7 +147,7 @@ public class DBHelper extends SQLiteOpenHelper {
 		}
 	}
 
-	public void InsertBook(Integer bookID, String title, String author, String coverHref, String rootURL, String updatedAtStr) {
+	public void insertBook(Integer bookID, String title, String author, String coverHref, String rootURL, String updatedAtStr) {
 		String sql = "Insert into books (id, bookID, title, author, coverHref, rootURL) values " +
 				"(NULL, " + bookID.toString() + ",'" + title + "', '" + author + "', '" + coverHref + "', '" + rootURL + "')";
 		//fixme test with titles with apostrophes

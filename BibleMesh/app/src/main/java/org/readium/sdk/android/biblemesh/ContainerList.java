@@ -120,7 +120,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 			//reset downloadStatus so it is never stuck in "downloading" phase
 			if (ep.downloadStatus == 1) {
 				ep.downloadStatus = 0;
-				dbHelper.SetDownloadStatus(ep.bookID, 0);
+				dbHelper.setDownloadStatus(ep.bookID, 0);
 			}
 			ep.author = cursor.getColAuthor();
 			ep.title = cursor.getColTitle();

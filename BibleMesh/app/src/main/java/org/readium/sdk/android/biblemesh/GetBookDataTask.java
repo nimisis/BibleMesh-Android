@@ -32,8 +32,7 @@ import org.readium.sdk.android.SdkErrorHandler;
 import org.readium.sdk.android.biblemesh.model.OpenPageRequest;
 
 public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
-
-
+	
 	private ContainerList activity;
 	private DBHelper dbHelper;
 	private String fstr;
@@ -122,11 +121,11 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 						JSONArray jArray = jsonobject.getJSONArray("highlights");
 						for (int i = 0; i < jArray.length(); i++) {
 							JSONObject jsonhobject = jArray.getJSONObject(i);
-							String cfi = jsonhobject.getString("cfi");
-							Integer color = jsonhobject.getInt("color");
-							String note = jsonhobject.getString("note");
-							Long hupdated_at = jsonhobject.getLong("updated_at");
-							dbHelper.insertHighlight(vid[0].bookID, cfi, color, note, hupdated_at);
+							dbHelper.insertHighlight(vid[0].bookID, jsonhobject.getString("spineIdRef"),
+									jsonhobject.getString("cfi"),
+									jsonhobject.getInt("color"),
+									jsonhobject.getString("note"),
+									jsonhobject.getLong("updated_at"));
 						}
 
 						idref = sidref;

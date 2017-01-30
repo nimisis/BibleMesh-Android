@@ -107,7 +107,7 @@ public class LoginActivity extends Activity {
 					if (insertNew) {
 
 						Log.v("db", "inserting new location");
-						dbHelper.InsertLocation(bookID, userID);
+						dbHelper.insertLocation(bookID, userID);
 						//search books for this bookid
 						DBCursor cursor2 = dbHelper.getBook(bookID);
 						//if does not exist, insert
@@ -119,7 +119,7 @@ public class LoginActivity extends Activity {
 							String coverHref = jsonobject.getString("coverHref");
 							String rootURL = jsonobject.getString("rootUrl");
 							String updatedAtStr = jsonobject.getString("updated_at");
-							dbHelper.InsertBook(bookID, title, author, coverHref, rootURL, updatedAtStr);
+							dbHelper.insertBook(bookID, title, author, coverHref, rootURL, updatedAtStr);
 						} else if (cnt > 1) {
 							//fix assert
 						}

@@ -951,10 +951,12 @@ public class WebViewActivity extends FragmentActivity implements
 					for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
 						cursor.moveToPosition(rowNum);
 						//fixme when have idrefs for highlights, compare first
-						mReadiumJSApi.addHighlight(idref, cursor.getColCFI());
-						/*if (idref.equals(cursor.getColIDRef())) {
+						//mReadiumJSApi.addHighlight(idref, cursor.getColCFI());
+						if (idref.equals(cursor.getColIDRef())) {
 							mReadiumJSApi.addHighlight(cursor.getColIDRef(), cursor.getColCFI());
-						}*/
+						} else {
+							Log.v("webview", "skip as idref not matched");
+						}
 					}
 				}
 			});
