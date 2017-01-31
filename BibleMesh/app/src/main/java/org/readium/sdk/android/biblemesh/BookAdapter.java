@@ -52,6 +52,7 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
             sqView.title = (TextView) rowView.findViewById(R.id.title);
             sqView.cover = (ImageView) rowView.findViewById(R.id.cover);
 
+
 	        //http://stackoverflow.com/questions/5776851/load-image-from-url
 	        //Log.v("shared", "new"+position);
             // Cache the view objects in the tag,
@@ -64,6 +65,9 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
 	            Log.v("shared", "click");
             }
             });*/
+
+	        sqView.author.setVisibility(View.VISIBLE);
+	        sqView.cover.setVisibility(View.VISIBLE);
 
             rowView.setTag(sqView);
         }
@@ -83,19 +87,18 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
 	        sqView.cover.setVisibility(View.INVISIBLE);
         } else */
         {
-	        sqView.author.setVisibility(View.VISIBLE);
-	        sqView.cover.setVisibility(View.VISIBLE);
 
         //sqView.cover.setImageBitmap(null);
         sqView.title.setText(frontBooks.get(position).title);
         sqView.author.setText(frontBooks.get(position).author);
         if (frontBooks.get(position).cover == null) {
-	        //Log.e("shared", "pos"+position+" is null");
 	        sqView.cover.setImageBitmap(null);
+	        Log.e("shared", "pos"+position+" is null");
 	        if (frontBooks.get(position).coverHref.equals("")) {
 	        } else {
-		        new DownloadImageTask(frontBooks.get(position), sqView.cover)
-        .execute("https://read.biblemesh.com/"+frontBooks.get(position).coverHref);
+		        //fix
+		        /*new DownloadImageTask(frontBooks.get(position), sqView.cover)
+        .execute("https://read.biblemesh.com/"+frontBooks.get(position).coverHref);*/
 		        //https://read.biblemesh.com/%@", [[ep locationToEpub] coverHref]
 	        }
         } else {

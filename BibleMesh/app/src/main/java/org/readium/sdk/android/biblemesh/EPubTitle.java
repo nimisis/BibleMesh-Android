@@ -6,6 +6,7 @@ public class EPubTitle {
 
 	public Integer bookID;
 	public Integer downloadStatus;
+	public Integer fsize;
 	public String author;
 	public String title;
 	public String coverHref;

@@ -44,6 +44,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.SQLException;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v4.content.ContextCompat;
@@ -122,6 +123,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 				ep.downloadStatus = 0;
 				dbHelper.setDownloadStatus(ep.bookID, 0);
 			}
+			ep.fsize = cursor.getColFSize();
 			ep.author = cursor.getColAuthor();
 			ep.title = cursor.getColTitle();
 			ep.coverHref = cursor.getColCoverHref();
@@ -147,10 +149,16 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 						String fstr = PATH + "book_"+Integer.toString(ep.bookID)+".epub";
 						File f = new File(fstr);
 						if (f.exists()) {
-							Log.v("library", "file exists");
+							Log.v("library", "file exists:"+f.length());
 
-							refreshData(dbHelper, ep, fstr);
-
+							//fix do comparison between expectedfsize and received size
+							if (ep.fsize != f.length()) {
+								Log.v("library", "unexpected file size, delete and re-download");
+								f.delete();
+								downloadIt = true;
+							} else {
+								refreshData(dbHelper, ep, fstr);
+							}
 						} else {//otherwise download it
 							Log.v("library", "download it");
 							downloadIt = true;
@@ -181,13 +189,15 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 						case 1: //TYPE_WIFI
 						case 2: //TYPE_MOBILE
 						{
-
-							if(PackageManager.PERMISSION_GRANTED == checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)){
-								//storageDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "myPhoto");
-
-								new DownloadTask(ContainerList.this, dbHelper).execute(ep);
+							if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+								if (PackageManager.PERMISSION_GRANTED == checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+									//storageDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "myPhoto");
+									new DownloadTask(ContainerList.this, dbHelper).execute(ep);
+								} else {
+									requestPermission(context);
+								}
 							} else {
-								requestPermission(context);
+								new DownloadTask(ContainerList.this, dbHelper).execute(ep);
 							}
 							//// FIXME: 25/01/2017 do check about wifi/mobile
 						}

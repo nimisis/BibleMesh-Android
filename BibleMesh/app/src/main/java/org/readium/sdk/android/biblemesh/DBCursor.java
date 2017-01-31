@@ -35,6 +35,9 @@ public class DBCursor extends SQLiteCursor {
 	public Integer getColBookID() {
 		return getInt(getColumnIndexOrThrow("bookID"));
 	}
+	public Integer getColFSize() {
+		return getInt(getColumnIndexOrThrow("fsize"));
+	}
 	public String getColTitle() {
 		return getString(getColumnIndexOrThrow("title"));
 	}

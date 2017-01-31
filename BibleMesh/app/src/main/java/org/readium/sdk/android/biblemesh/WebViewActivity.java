@@ -405,7 +405,10 @@ public class WebViewActivity extends FragmentActivity implements
 	@SuppressLint({ "SetJavaScriptEnabled", "NewApi" })
 	private void initWebView() {
 		mWebview.getSettings().setJavaScriptEnabled(true);
-		mWebview.getSettings().setMediaPlaybackRequiresUserGesture(false);
+
+		if (Build.VERSION.SDK_INT > Build.VERSION_CODES.JELLY_BEAN) {
+			mWebview.getSettings().setMediaPlaybackRequiresUserGesture(false);
+		}
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
 			mWebview.getSettings().setAllowUniversalAccessFromFileURLs(true);
 		}
@@ -928,7 +931,7 @@ public class WebViewActivity extends FragmentActivity implements
 					JSONObject postDict = new JSONObject();
 					JSONObject latest_location = new JSONObject();
 					latest_location.put("idref", bookmarkJson.getString("idref"));
-					latest_location.put("elementCFI", bookmarkJson.getString("contentCFI"));
+					latest_location.put("elementCfi", bookmarkJson.getString("contentCFI"));
 					String locStr = latest_location.toString();
 					String locStr2 = locStr.replace("\\/", "/");
 					postDict.put("latest_location", locStr2);
@@ -940,7 +943,12 @@ public class WebViewActivity extends FragmentActivity implements
 					URL url = new URL("https://read.biblemesh.com/users/"+LoginActivity.userID+"/books/1.json");
 					httpConn = (HttpURLConnection) url.openConnection();
 					httpConn.setDoOutput(true);
-					httpConn.setRequestMethod("PATCH");
+					if (true) {
+						httpConn.setRequestMethod("PATCH");
+					} else {
+						httpConn.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+						httpConn.setRequestMethod("POST");
+					}
 					httpConn.setRequestProperty("Accept", "application/json");
 					httpConn.setRequestProperty("Content-Type", "application/json");
 					Integer len = patch2.length();

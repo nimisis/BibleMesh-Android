@@ -25,7 +25,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-public class DownloadTask extends AsyncTask<EPubTitle, Integer, Long> {
+public class DownloadTask extends AsyncTask<EPubTitle, Integer, Integer> {
 	private static final int BUFFER_SIZE = 4096;
 	private Activity activity;
 	private DBHelper dbHelper;
@@ -73,30 +73,51 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Long> {
 		});*/
 	}
 
-	protected Long doInBackground(EPubTitle... vid) {
-        long totalSize = 0;
+	protected Integer doInBackground(EPubTitle... vid) {
+        Integer totalSize = 0;
 
 			vid[0].downloadStatus = 1;
 			dbHelper.setDownloadStatus(vid[0].bookID, vid[0].downloadStatus);
 			HttpURLConnection httpConn = null;
 			try {
-		        URL url = new URL("https://read.biblemesh.com/epub_content/book_"+vid[0].bookID.toString()+"/book.epub");
-		        httpConn = (HttpURLConnection) url.openConnection();
-		        httpConn.setRequestMethod("GET");
-		        //httpConn.setRequestProperty("Content-length", "0");
-		        //httpConn.setUseCaches(false);
-		        //httpConn.setAllowUserInteraction(false);
-		        //httpConn.setConnectTimeout(timeout);
-		        //httpConn.setReadTimeout(timeout);
-		        httpConn.connect();
-		        int responseCode = httpConn.getResponseCode();
+				URL resourceUrl, base, next;
+				String loca;
+				String url = "https://read.biblemesh.com/epub_content/book_" + vid[0].bookID.toString() + "/book.epub";
+				int responseCode;
 
+				while (true) {
+					resourceUrl = new URL(url);
+					httpConn = (HttpURLConnection) resourceUrl.openConnection();
+					httpConn.setRequestMethod("GET");
+					//httpConn.setRequestProperty("Content-length", "0");
+					//httpConn.setUseCaches(false);
+					//httpConn.setAllowUserInteraction(false);
+					//httpConn.setConnectTimeout(timeout);
+					//httpConn.setReadTimeout(timeout);
+					httpConn.setInstanceFollowRedirects(false);
+					httpConn.connect();
+					responseCode = httpConn.getResponseCode();
+					switch(responseCode) {
+						case HttpURLConnection.HTTP_MOVED_TEMP:
+						case HttpURLConnection.HTTP_MOVED_PERM:
+						case 307:
+							loca = httpConn.getHeaderField("Location");
+							base     = new URL(url);
+							next     = new URL(base, loca);  // Deal with relative URLs
+							url      = next.toExternalForm();
+							continue;
+					}
+					break;
+				}
 		        // always check HTTP response code first
 		        if (responseCode == HttpURLConnection.HTTP_OK) {
 			        //fix String contentType = httpConn.getContentType();
-			        int contentLength = httpConn.getContentLength();
+			        totalSize = httpConn.getContentLength();
 
-			        dialog.setMax(contentLength);
+			        vid[0].fsize = totalSize;
+			        dbHelper.setDownloadFSize(vid[0].bookID, totalSize);
+
+			        dialog.setMax(totalSize);
 
 			        String PATH = Environment.getExternalStorageDirectory() + "/Android/data/org.readium.sdk.android.biblemesh/";
 			        Log.v("doInBackground", "PATH:"+PATH);
@@ -150,7 +171,7 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Long> {
         dialog.setProgress(progress[0]);
     }
 
-    protected void onPostExecute(Long result) {
+    protected void onPostExecute(Integer result) {
     	Log.v("DownloadTask", "onPostExecute");
 
     	dialog.dismiss();

@@ -6,8 +6,8 @@ android {
 
     defaultConfig {
         applicationId = "org.readium.sdk.android.biblemesh"
-        minSdkVersion 23
-        targetSdkVersion 24
+        minSdkVersion 16
+        targetSdkVersion 23
     }
 
     sourceSets {

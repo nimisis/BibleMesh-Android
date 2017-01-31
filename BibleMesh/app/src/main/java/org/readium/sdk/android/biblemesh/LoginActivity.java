@@ -2,11 +2,14 @@ package org.readium.sdk.android.biblemesh;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 
@@ -39,6 +42,16 @@ public class LoginActivity extends Activity {
 		userID = 1;
 		serverTimeOffset = 0L;
 //		//llocation = new LLocation();
+
+		PackageInfo pInfo = null;
+		try {
+			pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+			String version = pInfo.versionName;
+			TextView vtv = (TextView) findViewById(R.id.versionTextView);
+			vtv.setText("v"+version);
+		} catch (PackageManager.NameNotFoundException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void login(View view) {

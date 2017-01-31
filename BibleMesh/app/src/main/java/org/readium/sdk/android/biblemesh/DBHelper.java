@@ -20,6 +20,7 @@ public class DBHelper extends SQLiteOpenHelper {
 			"CREATE TABLE books (" +
 					"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
 					"bookID INTEGER, " +
+					"fsize INTEGER, " +
 					"lastUpdated BIGINT, " + //fix 64
 					"author VARCHAR, " +
 					"title VARCHAR, " +
@@ -54,7 +55,7 @@ public class DBHelper extends SQLiteOpenHelper {
 	}
 
 	public DBCursor getLocations(Integer userID) {
-		String sql = "SELECT locations.*, books.title, books.author, books.coverHref, books.rootURL, books.downloadStatus FROM locations left join books on locations.bookID = books.bookID where locations.userID = " + userID.toString() + " order by locations.bookID asc";// + sortBy.toString();
+		String sql = "SELECT locations.*, books.title, books.author, books.coverHref, books.rootURL, books.downloadStatus, books.fsize FROM locations left join books on locations.bookID = books.bookID where locations.userID = " + userID.toString() + " order by locations.bookID asc";// + sortBy.toString();
 		SQLiteDatabase d = getReadableDatabase();
 		DBCursor c = (DBCursor) d.rawQueryWithFactory(
 				new DBCursor.Factory(),
@@ -131,6 +132,15 @@ public class DBHelper extends SQLiteOpenHelper {
 
 	public void setDownloadStatus(Integer bookID, Integer status) {
 		String sql = "UPDATE books set downloadStatus = " +status+" where bookID = " + bookID.toString();
+		try {
+			getWritableDatabase().execSQL(sql);
+		} catch (SQLException e) {
+			Log.e("Error setting dstatus", e.toString());
+		}
+	}
+
+	public void setDownloadFSize(Integer bookID, Integer fsize) {
+		String sql = "UPDATE books set fsize = "+fsize+" where bookID = " + bookID.toString();
 		try {
 			getWritableDatabase().execSQL(sql);
 		} catch (SQLException e) {
