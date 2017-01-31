@@ -169,6 +169,8 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 					//check internet connection status
 					//if not connected, alert
 					//else start download
+					//if (NetworkUtil.getConnectivityStatus(getApplicationContext()) == NetworkUtil.TYPE_NOT_CONNECTED) {
+
 					switch (NetworkUtil.getConnectivityStatus(context)) {
 						case 0://TYPE_NOT_CONNECTED
 						{

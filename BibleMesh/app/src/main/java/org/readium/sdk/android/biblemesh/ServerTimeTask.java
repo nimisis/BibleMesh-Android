@@ -57,7 +57,7 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
 
 			int responseCode = httpConn.getResponseCode();
 
-			Log.v("webview", "Response: "+responseCode);
+			Log.v("servertime", "Response: "+responseCode);
 
 			// always check HTTP response code first
 			if (responseCode == HttpURLConnection.HTTP_OK) {

@@ -1,15 +1,17 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    tools:context=".WebViewActivity" >
+			  xmlns:tools="http://schemas.android.com/tools"
+			  android:layout_width="match_parent"
+			  android:layout_height="match_parent"
+			  android:orientation="vertical"
+			  tools:context=".WebViewActivity" android:background="@android:color/white"
+			  android:onClick="showActionBar">
 
     <WebView
 		android:layout_width="match_parent"
 		android:layout_height="0dp"
 		android:layout_weight="1"
-		android:id="@+id/webview" android:layout_marginTop="30dp"/>
+		android:layout_marginTop="?android:attr/actionBarSize"
+		android:id="@+id/webview"/>
     
     <LinearLayout android:orientation="horizontal"
         android:layout_width="match_parent"
@@ -20,7 +22,8 @@
 			android:layout_width="wrap_content"
 			android:layout_height="match_parent"
 			android:gravity="center_vertical|center_horizontal"
-			android:id="@+id/progressBar" android:layout_weight="1"/>
+			android:id="@+id/progressBar" android:layout_weight="1"
+			android:layout_marginLeft="10dp" android:layout_marginRight="10dp"/>
     </LinearLayout>
 
 </LinearLayout>

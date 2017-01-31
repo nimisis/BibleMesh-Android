@@ -45,6 +45,9 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.RunnableFuture;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -73,6 +76,7 @@ import android.graphics.Bitmap;
 import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
@@ -85,12 +89,14 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
@@ -106,6 +112,9 @@ public class WebViewActivity extends FragmentActivity implements
 	private static final String ASSET_PREFIX = "file:///android_asset/readium-shared-js/";
 	private static final String READER_SKELETON = "file:///android_asset/readium-shared-js/reader.html";
 
+	//private Timer hide;
+	private Handler hide2;
+	private Runnable r;
 	// Installs "hook" function so that top-level window (application) can later
 	// inject the window.navigator.epubReadingSystem into this HTML document's
 	// iframe
@@ -243,6 +252,8 @@ public class WebViewActivity extends FragmentActivity implements
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		getWindow().requestFeature(Window.FEATURE_ACTION_BAR_OVERLAY);
+
 		setContentView(R.layout.activity_web_view);
 
 		mWebview = (WebView) findViewById(R.id.webview);
@@ -317,9 +328,50 @@ public class WebViewActivity extends FragmentActivity implements
 			}
 		});
 
-		ActionBar actionBar = getActionBar();
-		actionBar.hide();
-		getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+		/*Button back = (Button)findViewById(R.id.btnBack);
+		back.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				onBackPressed();
+				if(getActionBar.isShowing())
+				{
+					hideActionBar();
+				}
+				else
+				{
+					getActionBar.show();
+					hideActionBar();
+				}
+			}
+		});*/
+		r = new Runnable() {
+			@Override
+			public void run() {
+				getActionBar().hide();
+				//getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
+			}
+		};
+		hide2 = null;
+		hideActionBar();
+		//ActionBar actionBar = getActionBar();
+		//actionBar.hide();
+		//getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+	}
+
+	public void showActionBar(View v) {
+		getActionBar().show();
+		hideActionBar();
+	}
+
+	public void hideActionBar()
+	{
+		if (hide2 != null) {
+			hide2.removeCallbacks(r);
+		}
+
+		hide2 = new Handler();
+
+		hide2.postDelayed(r, 3000); // e.g. 3000 milliseconds
 	}
 
 	@Override
@@ -793,6 +845,7 @@ public class WebViewActivity extends FragmentActivity implements
 		public void onContentLoaded() {
 			if (!quiet)
 				Log.d(TAG, "onContentLoaded");
+
 		}
 
 		@JavascriptInterface

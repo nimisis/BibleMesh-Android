@@ -68,9 +68,16 @@ public class LoginWebViewActivity extends Activity {
 				view.loadUrl("javascript:console.log(document.body.innerHTML);");
 			}
 		});
+		int c = NetworkUtil.getConnectivityStatus(getApplicationContext());
+		if (NetworkUtil.getConnectivityStatus(getApplicationContext()) == NetworkUtil.TYPE_NOT_CONNECTED) {
+			Intent intent = new Intent();
+			setResult(RESULT_OK, intent);
 
-		mWebview.loadUrl("https://read.biblemesh.com/epub_content/epub_library.json");
-
+			//MainActivity.this.finish();
+			finish();
+		} else {
+			mWebview.loadUrl("https://read.biblemesh.com/epub_content/epub_library.json");
+		}
 		//getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 	}
 }

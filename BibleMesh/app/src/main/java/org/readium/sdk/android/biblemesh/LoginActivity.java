@@ -72,61 +72,65 @@ public class LoginActivity extends Activity {
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 		if (resultCode == RESULT_OK) {
 			Bundle res = data.getExtras();
-			String result = res.getString("token");
+			if (res == null) {
+				Log.v("result", "no token");
+			} else {
+				String result = res.getString("token");
 
-			DBHelper dbHelper = new DBHelper(getBaseContext());
-			DBCursor cursor = dbHelper.getLocations(userID);
-			Log.v("direct", String.format("Got %d locations", cursor.getCount()));
-			if (cursor.getCount() == 0) {
-				cursor = null;
-			}
+				DBHelper dbHelper = new DBHelper(getBaseContext());
+				DBCursor cursor = dbHelper.getLocations(userID);
+				Log.v("direct", String.format("Got %d locations", cursor.getCount()));
+				if (cursor.getCount() == 0) {
+					cursor = null;
+				}
 
-			try {
-				JSONArray jArray = new JSONArray(result);
-				for (int i = 0; i < jArray.length(); i++) {
-					JSONObject jsonobject = jArray.getJSONObject(i);
-					Integer bookID = jsonobject.getInt("id");
-					while ((cursor != null) && (cursor.getColBookID() < bookID)) {
-						//delete
-						if (!cursor.moveToNext()) {
-							cursor = null;
-						}
-					}
-					Boolean insertNew = false;
-					if (cursor != null) {
-						if (cursor.getColBookID() == bookID) {
+				try {
+					JSONArray jArray = new JSONArray(result);
+					for (int i = 0; i < jArray.length(); i++) {
+						JSONObject jsonobject = jArray.getJSONObject(i);
+						Integer bookID = jsonobject.getInt("id");
+						while ((cursor != null) && (cursor.getColBookID() < bookID)) {
+							//delete
 							if (!cursor.moveToNext()) {
 								cursor = null;
+							}
+						}
+						Boolean insertNew = false;
+						if (cursor != null) {
+							if (cursor.getColBookID() == bookID) {
+								if (!cursor.moveToNext()) {
+									cursor = null;
+								}
+							} else {
+								insertNew = true;
 							}
 						} else {
 							insertNew = true;
 						}
-					} else {
-						insertNew = true;
-					}
-					if (insertNew) {
+						if (insertNew) {
 
-						Log.v("db", "inserting new location");
-						dbHelper.insertLocation(bookID, userID);
-						//search books for this bookid
-						DBCursor cursor2 = dbHelper.getBook(bookID);
-						//if does not exist, insert
-						Integer cnt = cursor2.getCount();
-						if (cnt == 0) {
-							Log.v("db", "inserting new book");
-							String title = jsonobject.getString("title");
-							String author = jsonobject.getString("author");
-							String coverHref = jsonobject.getString("coverHref");
-							String rootURL = jsonobject.getString("rootUrl");
-							String updatedAtStr = jsonobject.getString("updated_at");
-							dbHelper.insertBook(bookID, title, author, coverHref, rootURL, updatedAtStr);
-						} else if (cnt > 1) {
-							//fix assert
+							Log.v("db", "inserting new location");
+							dbHelper.insertLocation(bookID, userID);
+							//search books for this bookid
+							DBCursor cursor2 = dbHelper.getBook(bookID);
+							//if does not exist, insert
+							Integer cnt = cursor2.getCount();
+							if (cnt == 0) {
+								Log.v("db", "inserting new book");
+								String title = jsonobject.getString("title");
+								String author = jsonobject.getString("author");
+								String coverHref = jsonobject.getString("coverHref");
+								String rootURL = jsonobject.getString("rootUrl");
+								String updatedAtStr = jsonobject.getString("updated_at");
+								dbHelper.insertBook(bookID, title, author, coverHref, rootURL, updatedAtStr);
+							} else if (cnt > 1) {
+								//fix assert
+							}
 						}
 					}
+				} catch (JSONException e) {
+					Log.v("json", e.getMessage());
 				}
-			} catch (JSONException e) {
-				Log.v("json", e.getMessage());
 			}
 
 			Integer dummy = 1;
