@@ -64,6 +64,7 @@ import org.readium.sdk.android.biblemesh.util.EpubServer.DataPreProcessor;
 import org.readium.sdk.android.biblemesh.util.HTMLUtil;
 
 import android.annotation.SuppressLint;
+import android.app.ActionBar;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -92,6 +93,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.VideoView;
 
@@ -207,7 +209,7 @@ public class WebViewActivity extends FragmentActivity implements
 	private Container mContainer;
 	private Package mPackage;
 	private OpenPageRequest mOpenPageRequestData;
-	private TextView mPageInfo;
+	private ProgressBar mProgress;
 	private ViewerSettings mViewerSettings;
 	private ReadiumJSApi mReadiumJSApi;
 	private EpubServer mServer;
@@ -249,7 +251,7 @@ public class WebViewActivity extends FragmentActivity implements
 			WebView.setWebContentsDebuggingEnabled(true);
 		}
 
-		mPageInfo = (TextView) findViewById(R.id.page_info);
+		mProgress = (ProgressBar) findViewById(R.id.progressBar);
 		initWebView();
 
 		final GestureDetector gestureDetector = new GestureDetector(this, new MyGestureListener());
@@ -314,6 +316,10 @@ public class WebViewActivity extends FragmentActivity implements
 				mWebview.loadUrl(javascript);
 			}
 		});
+
+		ActionBar actionBar = getActionBar();
+		actionBar.hide();
+		getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
 	}
 
 	@Override
@@ -735,11 +741,12 @@ public class WebViewActivity extends FragmentActivity implements
 				List<Page> openPages = paginationInfo.getOpenPages();
 				if (!openPages.isEmpty()) {
 					final Page page = openPages.get(0);
+					final int tpages = mPackage.getSpineItems().size() * page.getSpineItemPageCount();
+					final int pindex = page.getSpineItemPageIndex()+1 + page.getSpineItemIndex() * page.getSpineItemPageCount();
 					runOnUiThread(new Runnable() {
 						public void run() {
-							mPageInfo.setText(getString(R.string.page_x_of_y,
-									page.getSpineItemPageIndex() + 1,
-									page.getSpineItemPageCount()));
+							mProgress.setMax(tpages);
+							mProgress.setProgress(pindex);
 							SpineItem spineItem = mPackage.getSpineItem(page
 									.getIdref());
 							boolean isFixedLayout = spineItem
