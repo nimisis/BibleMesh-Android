@@ -910,21 +910,16 @@ public class WebViewActivity extends FragmentActivity implements
 				JSONObject bookmarkJson = new JSONObject(
 						bookmarkData);
 
-				bookmarkJson.getString("idref");
-				bookmarkJson.getString("contentCFI");
-
-				String ts1= new SimpleDateFormat("HH:mm:ss").format(new Date());
-				Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;//// FIXME: 29/01/2017
-				String ts2 = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTime());
+				//String ts1= new SimpleDateFormat("HH:mm:ss").format(new Date());
+				Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
+				//String ts2 = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTime());
 
 				//update local values
 				DBHelper dbHelper = new DBHelper(WebViewActivity.this);
 				dbHelper.setLocation(1, bookmarkJson.getString("idref"), bookmarkJson
 								.getString("contentCFI"), unixtime);
 
-				//Long unixtime = System.currentTimeMillis();//// FIXME: 29/01/2017 time sent seems to be overwritten
-
-				Log.v("webview", "unix:"+unixtime+ "ts:"+ts1+" ts2:"+ts2);
+				//Log.v("webview", "unix:"+unixtime+ "ts:"+ts1+" ts2:"+ts2);
 
 				HttpURLConnection httpConn = null;
 				try {
@@ -943,12 +938,16 @@ public class WebViewActivity extends FragmentActivity implements
 					URL url = new URL("https://read.biblemesh.com/users/"+LoginActivity.userID+"/books/1.json");
 					httpConn = (HttpURLConnection) url.openConnection();
 					httpConn.setDoOutput(true);
-					if (true) {
-						httpConn.setRequestMethod("PATCH");
-					} else {
+
+					if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+						/*header override method
 						httpConn.setRequestProperty("X-HTTP-Method-Override", "PATCH");
-						httpConn.setRequestMethod("POST");
+						httpConn.setRequestMethod("POST");*/
+						httpConn.setRequestMethod("PUT");
+					} else {
+						httpConn.setRequestMethod("PATCH");
 					}
+
 					httpConn.setRequestProperty("Accept", "application/json");
 					httpConn.setRequestProperty("Content-Type", "application/json");
 					Integer len = patch2.length();
@@ -1015,11 +1014,9 @@ public class WebViewActivity extends FragmentActivity implements
 				@Override
 				public void run() {
 					DBHelper dbHelper = new DBHelper(WebViewActivity.this);
-					DBCursor cursor = dbHelper.getHighlights(LoginActivity.userID, 1);//// FIXME: 29/01/2017
+					DBCursor cursor = dbHelper.getHighlights(1);//// FIXME: 29/01/2017
 					for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
 						cursor.moveToPosition(rowNum);
-						//fixme when have idrefs for highlights, compare first
-						//mReadiumJSApi.addHighlight(idref, cursor.getColCFI());
 						if (idref.equals(cursor.getColIDRef())) {
 							mReadiumJSApi.addHighlight(cursor.getColIDRef(), cursor.getColCFI());
 						} else {

@@ -67,7 +67,6 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Integer> {
 			
 			@Override
 			public void onCancel(DialogInterface dialog) {
-				// TODO Auto-generated method stub
 				Log.v("progress", "cancel");
 			}
 		});*/
@@ -101,6 +100,7 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Integer> {
 						case HttpURLConnection.HTTP_MOVED_TEMP:
 						case HttpURLConnection.HTTP_MOVED_PERM:
 						case 307:
+							Log.v("download", "follow redirect");
 							loca = httpConn.getHeaderField("Location");
 							base     = new URL(url);
 							next     = new URL(base, loca);  // Deal with relative URLs
@@ -137,6 +137,7 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Integer> {
 			        int bytesRead = -1;
 			        byte[] buffer = new byte[BUFFER_SIZE];
 			        while ((bytesRead = inputStream.read(buffer)) != -1) {
+				        Log.v("download", "bytes:"+bytesRead);
 				        fos.write(buffer, 0, bytesRead);
 				        totalSize += bytesRead;
 				        publishProgress((int) totalSize);

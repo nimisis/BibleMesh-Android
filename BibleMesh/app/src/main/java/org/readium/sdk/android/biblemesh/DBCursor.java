@@ -17,7 +17,6 @@ public class DBCursor extends SQLiteCursor {
 	public DBCursor(SQLiteDatabase db, SQLiteCursorDriver driver,
 	                String editTable, SQLiteQuery query) {
 		super(db, driver, editTable, query);
-		// TODO Auto-generated constructor stub
 	}
 
 	static class Factory implements SQLiteDatabase.CursorFactory {
@@ -29,6 +28,9 @@ public class DBCursor extends SQLiteCursor {
 		}
 	}
 
+	public Integer getColHID() {
+		return getInt(getColumnIndexOrThrow("id"));
+	}
 	public Integer getColDownloadStatus() {
 		return getInt(getColumnIndexOrThrow("downloadStatus"));
 	}

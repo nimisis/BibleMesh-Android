@@ -69,7 +69,7 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 	protected Long doInBackground(EPubTitle... vid) {
         long totalSize = 0;
 			HttpURLConnection httpConn = null;
-			DBCursor cursor = dbHelper.getLocation(LoginActivity.userID, vid[0].bookID);
+			DBCursor cursor = dbHelper.getLocation(vid[0].bookID);
 			idref = cursor.getColIDRef();
 			cfi = cursor.getColElementCFI();
 
@@ -112,21 +112,106 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 			        Long updated_at = jsonobject.getLong("updated_at");
 
 			        //fixme not sure about this logic
+			        /* pseudo code
+                 for each server highlight, look for matching in local,
+                 if match found
+                 compare lastupdated value
+                 if server value is newer (i.e. bigger)
+                 update local
+                 if server value is older (i.e. smaller)
+                 ignore
+                 if highlight is in queue to update the server (unlikely)
+                 ignore
+                 else
+                 update server (should never happen as !)
+                 if same
+                 ignore (no change)
+                 else
+                 add highlight to local
+
+                 for each local highlight not matched above
+                 if highlight is in queue to update the server
+                 ignore
+                 else
+                 delete (must have been deleted somewhere else)
+                */
+			        DBCursor hcursor = dbHelper.getHighlights(vid[0].bookID);
+			        Log.v("getbookdata", "numhighlights:"+hcursor.getCount());
+					Boolean validHighlights[] = new Boolean[hcursor.getCount()];
+			        for (int i = 0; i < hcursor.getCount(); i++) {
+				        validHighlights[i] = false;
+			        }
+			        JSONArray jArray = jsonobject.getJSONArray("highlights");
+			        for (int i = 0; i < jArray.length(); i++) {
+				        JSONObject jsonhobject = jArray.getJSONObject(i);
+				        String hcfi = jsonhobject.getString("cfi");
+				        String hidref = jsonhobject.getString("spineIdRef");
+
+				        Boolean foundMatch = false;
+				        hcursor.moveToFirst();
+				        for (int j = 0; j < hcursor.getCount(); j++) {
+							if (hcursor.getColCFI().equals(hcfi) &&
+									hcursor.getColIDRef().equals(hidref)) {
+								foundMatch = true;
+								validHighlights[j] = true;
+								if (jsonhobject.getLong("updated_at") > hcursor.getColLastUpdated()) {
+									dbHelper.updateHighlight(vid[0].bookID,
+											jsonhobject.getInt("color"),
+											jsonhobject.getString("note"),
+											jsonhobject.getLong("updated_at"));
+								} else if (jsonhobject.getLong("updated_at") < hcursor.getColLastUpdated()) {
+									//ignore
+								} else {
+									//ignore
+								}
+							}
+					        hcursor.moveToNext();
+				        }
+				        if (!foundMatch) {
+					        Log.v("getbookdata", "insert highlight");
+					        dbHelper.insertHighlight(vid[0].bookID,
+							        hidref,
+							        hcfi,
+							        jsonhobject.getInt("color"),
+							        jsonhobject.getString("note"),
+							        jsonhobject.getLong("updated_at"));
+				        }
+			        }
+			        //remove unmatched
+			        hcursor.moveToFirst();
+			        Log.v("getbookdata", "num:"+hcursor.getCount());
+			        for (int i = 0; i < hcursor.getCount(); i++) {
+				        if (validHighlights[i]) {
+					        //skip
+					        Log.v("getbookdata", "skip removing this highlight");
+				        } else {
+					        Log.v("getbookdata", "remove highlight:"+hcursor.getColIDRef());
+					        dbHelper.removeHighlight(hcursor.getColHID());
+				        }
+				        hcursor.moveToNext();
+			        }
+
+			        /*for (int i = 0; i < hcursor.getCount(); i++) {
+
+				        hcursor.moveToNext();
+			        }*/
+			        //remove highlights
+			        /*dbHelper.removeHighlights(vid[0].bookID);
+
+			        //insert highlights
+			        JSONArray jArray = jsonobject.getJSONArray("highlights");
+			        for (int i = 0; i < jArray.length(); i++) {
+				        JSONObject jsonhobject = jArray.getJSONObject(i);
+				        dbHelper.insertHighlight(vid[0].bookID, jsonhobject.getString("spineIdRef"),
+						        jsonhobject.getString("cfi"),
+						        jsonhobject.getInt("color"),
+						        jsonhobject.getString("note"),
+						        jsonhobject.getLong("updated_at"));
+			        }*/
+
+
 					if (updated_at > cursor.getColLastUpdated()) {
 						Log.v("getbook", "server is newer");
-						//remove highlights
-						dbHelper.removeHighlights(vid[0].bookID);
-
-						//insert highlights
-						JSONArray jArray = jsonobject.getJSONArray("highlights");
-						for (int i = 0; i < jArray.length(); i++) {
-							JSONObject jsonhobject = jArray.getJSONObject(i);
-							dbHelper.insertHighlight(vid[0].bookID, jsonhobject.getString("spineIdRef"),
-									jsonhobject.getString("cfi"),
-									jsonhobject.getInt("color"),
-									jsonhobject.getString("note"),
-									jsonhobject.getLong("updated_at"));
-						}
 
 						idref = sidref;
 						cfi = selementCfi;

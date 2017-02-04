@@ -51,11 +51,12 @@ public class DBHelper extends SQLiteOpenHelper {
 
 	public DBHelper(Context context) {
 		super(context, DATABASE_NAME, null, DATABASE_VERSION);
-		// TODO Auto-generated constructor stub
 	}
 
 	public DBCursor getLocations(Integer userID) {
-		String sql = "SELECT locations.*, books.title, books.author, books.coverHref, books.rootURL, books.downloadStatus, books.fsize FROM locations left join books on locations.bookID = books.bookID where locations.userID = " + userID.toString() + " order by locations.bookID asc";// + sortBy.toString();
+		String sql = "SELECT locations.*, books.title, books.author, books.coverHref, books.rootURL, books.downloadStatus, " +
+				"books.fsize FROM locations left join books on locations.bookID = books.bookID " +
+				"where locations.userID = " + userID.toString() + " order by locations.bookID asc";
 		SQLiteDatabase d = getReadableDatabase();
 		DBCursor c = (DBCursor) d.rawQueryWithFactory(
 				new DBCursor.Factory(),
@@ -66,8 +67,8 @@ public class DBHelper extends SQLiteOpenHelper {
 		return c;
 	}
 
-	public DBCursor getLocation(Integer userID, Integer bookID) {
-		String sql = "SELECT locations.* FROM locations where locations.bookID = "+bookID+" and locations.userID = " + userID.toString();// + sortBy.toString();
+	public DBCursor getLocation(Integer bookID) {
+		String sql = "SELECT locations.* FROM locations where locations.bookID = "+bookID+" and locations.userID = " + LoginActivity.userID.toString();
 		SQLiteDatabase d = getReadableDatabase();
 		DBCursor c = (DBCursor) d.rawQueryWithFactory(
 				new DBCursor.Factory(),
@@ -78,8 +79,8 @@ public class DBHelper extends SQLiteOpenHelper {
 		return c;
 	}
 
-	public DBCursor getHighlights(Integer userID, Integer bookID) {
-		String sql = "SELECT highlights.* FROM highlights where highlights.userID = " + userID.toString() + " and highlights.bookID = "+bookID.toString()+" order by highlights.cfi asc";
+	public DBCursor getHighlights(Integer bookID) {
+		String sql = "SELECT highlights.* FROM highlights where highlights.userID = " + LoginActivity.userID.toString() + " and highlights.bookID = "+bookID.toString()+" order by highlights.cfi asc";
 		SQLiteDatabase d = getReadableDatabase();
 		DBCursor c = (DBCursor) d.rawQueryWithFactory(
 				new DBCursor.Factory(),
@@ -102,111 +103,84 @@ public class DBHelper extends SQLiteOpenHelper {
 		return c;
 	}
 
-	public void removeHighlights(Integer bookID) {
-		String sql = "DELETE from highlights where bookID = "+bookID.toString()+" and userID = "+LoginActivity.userID.toString();
+	public void removeHighlight(Integer id) {
 		try {
-			getWritableDatabase().execSQL(sql);
+			getWritableDatabase().execSQL("DELETE from highlights where id = ?", new Object[]{id});
+		} catch (SQLException e) {
+			Log.e("removing highlight", e.toString());
+		}
+	}
+
+	public void removeHighlights(Integer bookID) {
+		try {
+			getWritableDatabase().execSQL("DELETE from highlights where bookID = ? and userID = ?", new Object[]{bookID, LoginActivity.userID});
 		} catch (SQLException e) {
 			Log.e("removing highlights", e.toString());
 		}
 	}
 
 	public void insertHighlight(Integer bookID, String idref, String cfi, Integer color, String note, Long hupdated_at) {
-		String sql = "INSERT into highlights (id, bookID, userID, cfi, idref, color, note, lastUpdated) values " +
-				"(NULL, "+bookID.toString()+", "+LoginActivity.userID.toString()+", '"+cfi+"', '"+idref+"', "+color.toString()+", '"+note+"', "+hupdated_at.toString()+")";
 		try {
-			getWritableDatabase().execSQL(sql);
+			getWritableDatabase().execSQL("INSERT into highlights (id, bookID, userID, cfi, idref, color, note, lastUpdated) values " +
+					"(NULL, ?, ?, ?, ?, ?, ?, ?)", new Object[] {bookID, LoginActivity.userID, cfi, idref, color, note, hupdated_at});
 		} catch (SQLException e) {
 			Log.e("inserting highlight", e.toString());
 		}
 	}
 
-	public void setLocation(Integer bookID, String idref, String elementCfi, Long updated_at) {
-		String sql = "UPDATE locations set idref = '" +idref+"', elementCfi = '"+elementCfi+"', lastUpdated = "+updated_at+" where bookID = " + bookID.toString()+" and userID = "+LoginActivity.userID;
+	public void updateHighlight(Integer bookID, Integer color, String note, Long hupdated_at) {
 		try {
-			getWritableDatabase().execSQL(sql);
+			getWritableDatabase().execSQL("UPDATE highlights set color = ?, note = ?, lastUpdate = ? where bookId = ? and userID = ?",
+					new Object[] {color, note, hupdated_at, bookID, LoginActivity.userID});
+		} catch (SQLException e) {
+			Log.e("updating highlight", e.toString());
+		}
+	}
+
+	public void setLocation(Integer bookID, String idref, String elementCfi, Long updated_at) {
+		try {
+			getWritableDatabase().execSQL("UPDATE locations set idref = ?, elementCfi = ?, lastUpdated = ? where bookID = ? and userID = ?",
+					new Object[] {idref, elementCfi, updated_at, bookID, LoginActivity.userID});
 		} catch (SQLException e) {
 			Log.e("Error setting location", e.toString());
 		}
 	}
 
 	public void setDownloadStatus(Integer bookID, Integer status) {
-		String sql = "UPDATE books set downloadStatus = " +status+" where bookID = " + bookID.toString();
 		try {
-			getWritableDatabase().execSQL(sql);
+			getWritableDatabase().execSQL("UPDATE books set downloadStatus = ? where bookID = ?", new Object[]{status, bookID});
 		} catch (SQLException e) {
 			Log.e("Error setting dstatus", e.toString());
 		}
 	}
 
 	public void setDownloadFSize(Integer bookID, Integer fsize) {
-		String sql = "UPDATE books set fsize = "+fsize+" where bookID = " + bookID.toString();
 		try {
-			getWritableDatabase().execSQL(sql);
+			getWritableDatabase().execSQL("UPDATE books set fsize = ? where bookID = ?", new Object[] {fsize, bookID});
 		} catch (SQLException e) {
 			Log.e("Error setting dstatus", e.toString());
 		}
 	}
 
 	public void insertLocation(Integer bookID, Integer userID) {
-		String sql = "Insert into locations (id, bookID, userID) values (NULL, " + bookID.toString() + "," + userID.toString() + ")";
 		try {
-			getWritableDatabase().execSQL(sql);
+			getWritableDatabase().execSQL("Insert into locations (id, bookID, userID) values (NULL, ?,?)", new Object[]{bookID, userID});
 		} catch (SQLException e) {
 			Log.e("Error adding location", e.toString());
 		}
 	}
 
 	public void insertBook(Integer bookID, String title, String author, String coverHref, String rootURL, String updatedAtStr) {
-		String sql = "Insert into books (id, bookID, title, author, coverHref, rootURL) values " +
-				"(NULL, " + bookID.toString() + ",'" + title + "', '" + author + "', '" + coverHref + "', '" + rootURL + "')";
-		//fixme test with titles with apostrophes
 		try {
-			getWritableDatabase().execSQL(sql);
+			getWritableDatabase().execSQL("Insert into books (id, bookID, title, author, coverHref, rootURL) values " +
+					"(NULL, ?, ?, ?, ?, ?)", new Object[]{bookID, title, author, coverHref, rootURL});
 		} catch (SQLException e) {
 			Log.e("Error adding book", e.toString());
 		}
 	}
 
-	/*public DeliveriesCursor getDeliveries(){
-		String sql = "SELECT * FROM deliveries order by id asc";// + sortBy.toString();
-		SQLiteDatabase d = getReadableDatabase();
-		DeliveriesCursor c = (DeliveriesCursor) d.rawQueryWithFactory(
-				new DeliveriesCursor.Factory(),
-				sql,
-				null,
-				null);
-		c.moveToFirst();
-		return c;
-	}
-
-	public DeliveriesCursor setScanned(Integer deliveryID){
-		String sql = "UPDATE deliveries set scanned = 1 where delivery_id = "+deliveryID;// + sortBy.toString();
-		SQLiteDatabase d = getWritableDatabase();
-		DeliveriesCursor c = (DeliveriesCursor) d.rawQueryWithFactory(
-				new DeliveriesCursor.Factory(),
-				sql,
-				null,
-				null);
-		c.moveToFirst();
-		return c;
-	}
-
-	public DeliveriesCursor setDelivered(Integer deliveryID, Integer stage){
-		String sql = "UPDATE deliveries set delivered = "+stage+" where delivery_id = "+deliveryID;// + sortBy.toString();
-		SQLiteDatabase d = getWritableDatabase();
-		DeliveriesCursor c = (DeliveriesCursor) d.rawQueryWithFactory(
-				new DeliveriesCursor.Factory(),
-				sql,
-				null,
-				null);
-		c.moveToFirst();
-		return c;
-	}*/
-
 	@Override
 	public void onCreate(SQLiteDatabase db) {
-		// TODO Auto-generated method stub
 		Log.v("db", "onCreate");
 		try {
 			db.execSQL(BOOKS_TABLE_CREATE);
@@ -219,7 +193,6 @@ public class DBHelper extends SQLiteOpenHelper {
 
 	@Override
 	public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-		// TODO Auto-generated method stub
 		Log.v("db", "onUpgrade");
 	}
 }

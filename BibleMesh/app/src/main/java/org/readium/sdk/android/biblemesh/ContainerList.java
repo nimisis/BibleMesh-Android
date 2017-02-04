@@ -214,7 +214,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 
 	void refreshData(DBHelper dbHelper, EPubTitle ep, String fstr) {
 		//DBHelper dbHelper = new DBHelper(getApplicationContext());
-		DBCursor cursor = dbHelper.getHighlights(LoginActivity.userID, ep.bookID);
+		DBCursor cursor = dbHelper.getHighlights(ep.bookID);
 
 		new GetBookDataTask(ContainerList.this, dbHelper, fstr).execute(ep);
 
