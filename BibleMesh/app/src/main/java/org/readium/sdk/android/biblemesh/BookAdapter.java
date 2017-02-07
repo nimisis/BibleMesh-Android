@@ -97,8 +97,8 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
 	        if (frontBooks.get(position).coverHref.equals("")) {
 	        } else {
 		        //fix
-		        /*new DownloadImageTask(frontBooks.get(position), sqView.cover)
-        .execute("https://read.biblemesh.com/"+frontBooks.get(position).coverHref);*/
+		        new DownloadImageTask(frontBooks.get(position), sqView.cover)
+        .execute("https://read.biblemesh.com/"+frontBooks.get(position).coverHref);
 		        //https://read.biblemesh.com/%@", [[ep locationToEpub] coverHref]
 	        }
         } else {

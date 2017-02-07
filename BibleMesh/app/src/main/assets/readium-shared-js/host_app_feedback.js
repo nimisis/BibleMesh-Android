@@ -215,13 +215,14 @@ require(['readium_shared_js/views/reader_view'], function (ReaderView)
                                                     console.log("ANNOTATION CLICKed: " + id);
                                                     //reader.plugins.highlights.removeHighlight(id);
                     if(window.LauncherUI && window.LauncherUI.onAnnotationClicked) {
-                        window.LauncherUI.onAnnotationClicked(JSON.stringify(id));
+                        window.LauncherUI.onAnnotationClicked(id);
                     }
                                                     });
-                    reader.plugins.highlights.on("textSelectionEvent", function() {
+                    /*reader.plugins.highlights.on("textSelectionEvent", function() {
                                                     console.log("ANNOTATION SELECT");
-                                                    reader.plugins.highlights.addSelectionHighlight(Math.floor((Math.random()*1000000)), "highlight");
-                                                    });
+                                                    window.LauncherUI.highlightSelection(reader.plugins.highlights.getCurrentSelectionCfi(), 'test1');
+                                                    //reader.plugins.highlights.addSelectionHighlight(Math.floor((Math.random()*1000000)), "highlight");
+                                                    });*/
                   }
 
         // external (require()'d via Dependency Injection, see examplePluginConfig function parameter passed above)

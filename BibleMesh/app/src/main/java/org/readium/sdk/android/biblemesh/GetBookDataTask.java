@@ -155,10 +155,11 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 								foundMatch = true;
 								validHighlights[j] = true;
 								if (jsonhobject.getLong("updated_at") > hcursor.getColLastUpdated()) {
-									dbHelper.updateHighlight(vid[0].bookID,
+									dbHelper.updateHighlight(hcursor.getColID(),
+											vid[0].bookID,
 											jsonhobject.getInt("color"),
 											jsonhobject.getString("note"),
-											jsonhobject.getLong("updated_at"));
+											jsonhobject.getLong("updated_at"), 0);
 								} else if (jsonhobject.getLong("updated_at") < hcursor.getColLastUpdated()) {
 									//ignore
 								} else {
@@ -174,7 +175,7 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 							        hcfi,
 							        jsonhobject.getInt("color"),
 							        jsonhobject.getString("note"),
-							        jsonhobject.getLong("updated_at"));
+							        jsonhobject.getLong("updated_at"), 0);
 				        }
 			        }
 			        //remove unmatched
@@ -186,7 +187,7 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 					        Log.v("getbookdata", "skip removing this highlight");
 				        } else {
 					        Log.v("getbookdata", "remove highlight:"+hcursor.getColIDRef());
-					        dbHelper.removeHighlight(hcursor.getColHID());
+					        dbHelper.removeHighlight(hcursor.getColID());
 				        }
 				        hcursor.moveToNext();
 			        }

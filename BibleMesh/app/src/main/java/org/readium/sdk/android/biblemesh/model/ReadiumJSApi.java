@@ -26,6 +26,7 @@ package org.readium.sdk.android.biblemesh.model;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.readium.sdk.android.Package;
+import org.readium.sdk.android.biblemesh.Highlight;
 
 import android.util.Log;
 
@@ -47,20 +48,31 @@ public class ReadiumJSApi {
 		loadJS("window.LauncherUI.getBookmarkData(ReadiumSDK.reader.bookmarkCurrentPage());");
 	}
 
-	public void updateLocation() {
-		loadJS("window.LauncherUI.updateLocation(ReadiumSDK.reader.bookmarkCurrentPage());");
+	public void updateLocation(Long unixtime, Integer annotationID, Boolean delete) {
+		if (delete) {
+			loadJS("ReadiumSDK.reader.plugins.highlights.removeHighlight(" + annotationID + ")");
+			loadJS("window.LauncherUI.updateLocation(ReadiumSDK.reader.bookmarkCurrentPage(), '"+unixtime.toString()+"', '"+annotationID.toString()+"', '1');");
+		} else {
+			loadJS("window.LauncherUI.updateLocation(ReadiumSDK.reader.bookmarkCurrentPage(), '"+unixtime.toString()+"', '"+annotationID.toString()+"', '0');");
+		}
 	}
 
 	public void removeHighlights(String idref) {
 		loadJS("window.LauncherUI.removeHighlights(ReadiumSDK.reader.plugins.highlights.removeHighlightsByType('highlight'), '"+idref+"');");
 	}
 
-	public void addHighlight(String idref, String cfi) {
-		loadJS("window.LauncherUI.addHighlight(ReadiumSDK.reader.plugins.highlights.addHighlight('"+idref+"', '"+cfi+"', Math.floor((Math.random()*1000000)), 'highlight'));");
+	public void addHighlight(String idref, String cfi, Integer annotationID) {
+		//loadJS("window.LauncherUI.addHighlight(ReadiumSDK.reader.plugins.highlights.addHighlight('"+idref+"', '"+cfi+"', "+annotationID+", 'highlight'));");
+		loadJS("ReadiumSDK.reader.plugins.highlights.addHighlight('"+idref+"', '"+cfi+"', "+annotationID+", 'highlight')");
 	}
 
 	public void highlightSelection() {
-		loadJS("ReadiumSDK.reader.plugins.highlights.addSelectionHighlight(Math.floor((Math.random()*1000000)), 'highlight');");
+		//ReadiumSDK.reader.bookmarkCurrentPage()
+		//loadJS("window.LauncherUI.highlightSelection(ReadiumSDK.reader.plugins.highlights.removeHighlightsByType('highlight'), 'hello');");
+		//loadJS("ReadiumSDK.reader.plugins.highlights.getCurrentSelectionCfi();");
+		//Integer random = 123;
+		//loadJS("ReadiumSDK.reader.plugins.highlights.addSelectionHighlight(1234, 'highlight');");
+		loadJS("window.LauncherUI.highlightSelection(JSON.stringify(ReadiumSDK.reader.plugins.highlights.getCurrentSelectionCfi()));");
 	}
 
 	public void openPageLeft() {

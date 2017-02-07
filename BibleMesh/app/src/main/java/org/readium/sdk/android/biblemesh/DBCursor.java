@@ -28,7 +28,7 @@ public class DBCursor extends SQLiteCursor {
 		}
 	}
 
-	public Integer getColHID() {
+	public Integer getColID() {
 		return getInt(getColumnIndexOrThrow("id"));
 	}
 	public Integer getColDownloadStatus() {
@@ -60,6 +60,12 @@ public class DBCursor extends SQLiteCursor {
 	}
 	public String getColAuthor() {
 		return getString(getColumnIndexOrThrow("author"));
+	}
+	public String getColNote() {
+		return getString(getColumnIndexOrThrow("note"));
+	}
+	public Integer getColColor() {
+		return getInt(getColumnIndexOrThrow("color"));
 	}
 
 	/*public String getColTrackingno() {

@@ -46,7 +46,8 @@ public class DBHelper extends SQLiteOpenHelper {
 					"color INTEGER, " +
 					"cfi VARCHAR, " +
 					"idref VARCHAR, " +
-					"note VARCHAR " +
+					"note VARCHAR, " +
+					"annotationID INTEGER" +
 					");";
 
 	public DBHelper(Context context) {
@@ -91,6 +92,18 @@ public class DBHelper extends SQLiteOpenHelper {
 		return c;
 	}
 
+	public DBCursor getHighlight(Integer bookID, Integer annotationID) {
+		String sql = "SELECT highlights.* FROM highlights where highlights.userID = " + LoginActivity.userID.toString() + " and highlights.bookID = "+bookID.toString()+" and highlights.annotationID = "+annotationID;
+		SQLiteDatabase d = getReadableDatabase();
+		DBCursor c = (DBCursor) d.rawQueryWithFactory(
+				new DBCursor.Factory(),
+				sql,
+				null,
+				null);
+		c.moveToFirst();
+		return c;
+	}
+
 	public DBCursor getBook(Integer bookID) {
 		String sql = "SELECT * FROM books where bookID = " + bookID.toString();
 		SQLiteDatabase d = getReadableDatabase();
@@ -119,19 +132,19 @@ public class DBHelper extends SQLiteOpenHelper {
 		}
 	}
 
-	public void insertHighlight(Integer bookID, String idref, String cfi, Integer color, String note, Long hupdated_at) {
+	public void insertHighlight(Integer bookID, String idref, String cfi, Integer color, String note, Long hupdated_at, Integer annotationID) {
 		try {
-			getWritableDatabase().execSQL("INSERT into highlights (id, bookID, userID, cfi, idref, color, note, lastUpdated) values " +
-					"(NULL, ?, ?, ?, ?, ?, ?, ?)", new Object[] {bookID, LoginActivity.userID, cfi, idref, color, note, hupdated_at});
+			getWritableDatabase().execSQL("INSERT into highlights (id, bookID, userID, cfi, idref, color, note, lastUpdated, annotationID) values " +
+					"(NULL, ?, ?, ?, ?, ?, ?, ?, ?)", new Object[] {bookID, LoginActivity.userID, cfi, idref, color, note, hupdated_at, annotationID});
 		} catch (SQLException e) {
 			Log.e("inserting highlight", e.toString());
 		}
 	}
 
-	public void updateHighlight(Integer bookID, Integer color, String note, Long hupdated_at) {
+	public void updateHighlight(Integer highlightID, Integer bookID, Integer color, String note, Long hupdated_at, Integer annotationID) {
 		try {
-			getWritableDatabase().execSQL("UPDATE highlights set color = ?, note = ?, lastUpdate = ? where bookId = ? and userID = ?",
-					new Object[] {color, note, hupdated_at, bookID, LoginActivity.userID});
+			getWritableDatabase().execSQL("UPDATE highlights set color = ?, note = ?, lastUpdated = ?, annotationID = ? where bookId = ? and userID = ? and id = ?",
+					new Object[] {color, note, hupdated_at, annotationID, bookID, LoginActivity.userID, highlightID});
 		} catch (SQLException e) {
 			Log.e("updating highlight", e.toString());
 		}

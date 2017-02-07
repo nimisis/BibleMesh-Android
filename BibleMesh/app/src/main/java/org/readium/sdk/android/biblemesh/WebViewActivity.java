@@ -424,7 +424,8 @@ public class WebViewActivity extends FragmentActivity implements
 			case R.id.add_bookmark:
 				if (!quiet)
 					Log.d(TAG, "Add a bookmark");
-				mReadiumJSApi.bookmarkCurrentPage();
+				//mReadiumJSApi.bookmarkCurrentPage();
+				mReadiumJSApi.highlightSelection();
 				return true;
 			/*case R.id.add_highlight:
 				if (!quiet)
@@ -811,7 +812,10 @@ public class WebViewActivity extends FragmentActivity implements
 							mWebview.getSettings()
 									.setDisplayZoomControls(false);
 
-							mReadiumJSApi.updateLocation();
+							Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
+							Integer annotationID = -1;
+							Boolean del = false;
+							mReadiumJSApi.updateLocation(unixtime, annotationID, del);
 							updateHighlights(page.getIdref());
 						}
 					});
@@ -902,7 +906,7 @@ public class WebViewActivity extends FragmentActivity implements
 		// }
 
 		@JavascriptInterface
-		public void updateLocation(final String bookmarkData) {
+		public void updateLocation(final String bookmarkData, final String unixtimestr, final String annotationIDstr, final String delstr) {
 			if (!quiet)
 				Log.d(TAG, "updateHighlights:" + bookmarkData);
 
@@ -910,15 +914,26 @@ public class WebViewActivity extends FragmentActivity implements
 				JSONObject bookmarkJson = new JSONObject(
 						bookmarkData);
 
+				Long unixtime = Long.parseLong(unixtimestr);
+				Integer annotationID = Integer.parseInt(annotationIDstr);
+				Boolean del = false;//Boolean.p(delstr);
+				if (delstr.equals("1")) {
+					del = true;
+				}
 				//String ts1= new SimpleDateFormat("HH:mm:ss").format(new Date());
-				Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
+				//Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
 				//String ts2 = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTime());
 
 				//update local values
 				DBHelper dbHelper = new DBHelper(WebViewActivity.this);
-				dbHelper.setLocation(1, bookmarkJson.getString("idref"), bookmarkJson
-								.getString("contentCFI"), unixtime);
-
+				if (annotationID == -1) {
+					//// FIXME: 07/02/2017 1 = bookID
+					dbHelper.setLocation(1,
+							bookmarkJson.getString("idref"),
+							bookmarkJson.getString("contentCFI"),
+							unixtime);
+				} else {
+				}
 				//Log.v("webview", "unix:"+unixtime+ "ts:"+ts1+" ts2:"+ts2);
 
 				HttpURLConnection httpConn = null;
@@ -932,6 +947,20 @@ public class WebViewActivity extends FragmentActivity implements
 					postDict.put("latest_location", locStr2);
 					postDict.put("updated_at", unixtime);
 					JSONArray highlights = new JSONArray();
+					if (annotationID == -1) {
+					} else {
+						DBCursor hc = dbHelper.getHighlight(1, annotationID);
+						JSONObject hld = new JSONObject();
+						hld.put("spineIdRef", hc.getColIDRef());
+						hld.put("cfi", hc.getColCFI());
+						hld.put("color", hc.getColColor());
+						hld.put("note", hc.getColNote());
+						hld.put("updated_at", hc.getColLastUpdated());
+						if (del) {
+							hld.put("_delete", true);
+						}
+						highlights.put(hld);
+					}
 					postDict.put("highlights", highlights);
 					String patch = postDict.toString();
 					String patch2 = patch.replace("\\/", "/");
@@ -1018,7 +1047,11 @@ public class WebViewActivity extends FragmentActivity implements
 					for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
 						cursor.moveToPosition(rowNum);
 						if (idref.equals(cursor.getColIDRef())) {
-							mReadiumJSApi.addHighlight(cursor.getColIDRef(), cursor.getColCFI());
+
+							Integer random = (int) (Math.random() * 1000000 + 1);
+							dbHelper.updateHighlight(
+									cursor.getColID(), 1, cursor.getColColor(), cursor.getColNote(), cursor.getColLastUpdated(), random);
+							mReadiumJSApi.addHighlight(cursor.getColIDRef(), cursor.getColCFI(), random);
 						} else {
 							Log.v("webview", "skip as idref not matched");
 						}
@@ -1028,10 +1061,67 @@ public class WebViewActivity extends FragmentActivity implements
 		}
 
 		@JavascriptInterface
+		public void highlightSelection(final String response) {
+			if (!quiet)
+				Log.d(TAG, "highlightSelection:" + response);
+
+			try {
+				final JSONObject selJson = new JSONObject(response);
+				final String selidref = selJson.getString("idref");
+				final String selcfi = selJson.getString("cfi");
+
+				final Integer random = (int) (Math.random() * 1000000 + 1);
+
+				DBHelper dbHelper = new DBHelper(WebViewActivity.this);
+				final Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
+				dbHelper.insertHighlight(1, selidref, selcfi, 1, "", unixtime, random);//// FIXME: 29/01/2017
+
+				runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						/*DBHelper dbHelper = new DBHelper(WebViewActivity.this);
+						DBCursor cursor = dbHelper.getHighlights(1);//// FIXME: 29/01/2017
+						for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
+							cursor.moveToPosition(rowNum);*/
+							//if (idref.equals(cursor.getColIDRef())) {
+								mReadiumJSApi.addHighlight(selidref, selcfi, random);
+								mReadiumJSApi.updateLocation(unixtime, random, false);
+							//} else {
+							//	Log.v("webview", "skip as idref not matched");
+							//}
+						//}
+					}
+				});
+
+			} catch (JSONException e) {
+				Log.v("webview", e.getMessage());
+			}
+			/*try {
+				JSONObject selectionJson = new JSONObject(response);
+			} catch(JSONException e) {
+				Log.v("webview", e.getMessage());
+			}*/
+		}
+
+/*
+		@JavascriptInterface
 		public void addHighlight(final String response) {
 			if (!quiet)
 				Log.d(TAG, "addHighlight:" + response);
-		}
+
+			runOnUiThread(new Runnable() {
+				@Override
+				public void run() {
+					//if (idref.equals(cursor.getColIDRef())) {
+					mReadiumJSApi.addHighlight(selidref, selcfi, random);
+					//mReadiumJSApi.updateLocation(unixtime, random, false);
+					//} else {
+					//	Log.v("webview", "skip as idref not matched");
+					//}
+					//}
+				}
+			});
+		}*/
 
 		@JavascriptInterface
 		public void getBookmarkData(final String bookmarkData) {
@@ -1069,29 +1159,64 @@ public class WebViewActivity extends FragmentActivity implements
 		}
 
 		@JavascriptInterface
-		public void onAnnotationClicked(String id) {
+		public void onAnnotationClicked(final String id) {
 			if (!quiet)
 				Log.d(TAG, "onAnnotationClicked:" + id);
 			// this should be real json parsing if there will be more data that
 			// needs to be extracted
+
+			final DBHelper dbHelper = new DBHelper(WebViewActivity.this);
+			final DBCursor cursor = dbHelper.getHighlight(1, Integer.parseInt(id));
+			final DBCursor cursor2 = dbHelper.getLocation(1);
+
+			final EditText editText = new EditText(WebViewActivity.this);
+			editText.setLines(3);
+			editText.setId(android.R.id.edit);
+			editText.setHint("Notes");
+			editText.setText(cursor.getColNote());
+
 			AlertDialog.Builder builder = new AlertDialog.Builder(
 					WebViewActivity.this)
-					.setTitle("Annotation clicked")
-					.setMessage(id)
-
-			/*final EditText editText = new EditText(WebViewActivity.this);
-			editText.setId(android.R.id.edit);
-			editText.setHint(R.string.title);
-			builder.setView(editText);*/
-				.setPositiveButton(android.R.string.ok,
-					new DialogInterface.OnClickListener() {
-
+					//.setTitle("")
+					//.setMessage(id)
+					.setView(editText)
+					.setCancelable(true)
+					.setNegativeButton("Delete", new DialogInterface.OnClickListener() {
 						@Override
 						public void onClick(DialogInterface dialog, int which) {
-dialog.dismiss();
+							runOnUiThread(new Runnable() {
+								@Override
+								public void run() {
+									mReadiumJSApi.updateLocation(cursor2.getColLastUpdated(), Integer.parseInt(id), true);
+								}});
+							dialog.dismiss();
+						}
+					})
+					.setNeutralButton("Share", new DialogInterface.OnClickListener() {
+						@Override
+						public void onClick(DialogInterface dialog, int which) {
+							//// FIXME: 07/02/2017 todo
+							dialog.dismiss();
+						}
+					})
+					.setPositiveButton("Save",
+					new DialogInterface.OnClickListener() {
+						@Override
+						public void onClick(DialogInterface dialog, int which) {
+							dbHelper.updateHighlight(cursor.getColID(), 1, cursor.getColColor(), editText.getText().toString(), cursor.getColLastUpdated(), Integer.parseInt(id));
+
+
+							runOnUiThread(new Runnable() {
+								@Override
+								public void run() {
+									mReadiumJSApi.updateLocation(cursor2.getColLastUpdated(), Integer.parseInt(id), false);
+								}
+							});
+							dialog.dismiss();
+
 						}
 					});
-			builder.setNegativeButton(android.R.string.cancel, null);
+			//builder.setNegativeButton(android.R.string.cancel, null);
 			builder.show();
 
 		}
@@ -1105,7 +1230,7 @@ dialog.dismiss();
 			mActionMode = mode;
 			Menu menu = mode.getMenu();
 			// Remove the default menu items (select all, copy, paste, search)
-			//menu.clear();
+			menu.clear();
 
 			// If you want to keep any of the defaults,
 			// remove the items you don't want individually:
@@ -1123,8 +1248,13 @@ dialog.dismiss();
 	public void onContextualMenuItemClicked(MenuItem item) {
 		switch (item.getItemId()) {
 			case R.id.highlight_item:
+			{
+				//Integer random = (int) (Math.random() * 1000000 + 1);
 				mReadiumJSApi.highlightSelection();
-				break;
+				//DBHelper dbhelper = new DBHelper(this);
+				//dbhelper.updateHighlight();
+			}
+			break;
 			default:
 				// ...
 				break;
