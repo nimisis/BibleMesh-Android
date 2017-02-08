@@ -50,7 +50,6 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 	@Override
 	protected void onCancelled() {
 		Log.v("GetBookDataTask", "onCancelled");
-		//dbHelper
 		//// FIXME: 26/01/2017 reset downloadStatus
 	}
 		
@@ -60,7 +59,6 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 			
 			@Override
 			public void onCancel(DialogInterface dialog) {
-				// TODO Auto-generated method stub
 				Log.v("progress", "cancel");
 			}
 		});*/
@@ -111,7 +109,6 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 			        String selementCfi = jsonlobject.getString("elementCfi");
 			        Long updated_at = jsonobject.getLong("updated_at");
 
-			        //fixme not sure about this logic
 			        /* pseudo code
                  for each server highlight, look for matching in local,
                  if match found

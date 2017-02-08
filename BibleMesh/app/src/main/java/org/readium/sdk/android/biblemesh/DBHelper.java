@@ -124,13 +124,13 @@ public class DBHelper extends SQLiteOpenHelper {
 		}
 	}
 
-	public void removeHighlights(Integer bookID) {
+	/*public void removeHighlights(Integer bookID) {
 		try {
 			getWritableDatabase().execSQL("DELETE from highlights where bookID = ? and userID = ?", new Object[]{bookID, LoginActivity.userID});
 		} catch (SQLException e) {
 			Log.e("removing highlights", e.toString());
 		}
-	}
+	}*/
 
 	public void insertHighlight(Integer bookID, String idref, String cfi, Integer color, String note, Long hupdated_at, Integer annotationID) {
 		try {

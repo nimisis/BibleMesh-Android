@@ -157,6 +157,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 								f.delete();
 								downloadIt = true;
 							} else {
+								LoginActivity.bookID = ep.bookID;
 								refreshData(dbHelper, ep, fstr);
 							}
 						} else {//otherwise download it

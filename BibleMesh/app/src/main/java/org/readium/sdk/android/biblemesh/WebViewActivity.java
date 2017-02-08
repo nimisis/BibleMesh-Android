@@ -112,7 +112,6 @@ public class WebViewActivity extends FragmentActivity implements
 	private static final String ASSET_PREFIX = "file:///android_asset/readium-shared-js/";
 	private static final String READER_SKELETON = "file:///android_asset/readium-shared-js/reader.html";
 
-	//private Timer hide;
 	private Handler hide2;
 	private Runnable r;
 	// Installs "hook" function so that top-level window (application) can later
@@ -916,19 +915,15 @@ public class WebViewActivity extends FragmentActivity implements
 
 				Long unixtime = Long.parseLong(unixtimestr);
 				Integer annotationID = Integer.parseInt(annotationIDstr);
-				Boolean del = false;//Boolean.p(delstr);
+				Boolean del = false;
 				if (delstr.equals("1")) {
 					del = true;
 				}
-				//String ts1= new SimpleDateFormat("HH:mm:ss").format(new Date());
-				//Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
-				//String ts2 = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTime());
 
 				//update local values
 				DBHelper dbHelper = new DBHelper(WebViewActivity.this);
 				if (annotationID == -1) {
-					//// FIXME: 07/02/2017 1 = bookID
-					dbHelper.setLocation(1,
+					dbHelper.setLocation(LoginActivity.bookID,
 							bookmarkJson.getString("idref"),
 							bookmarkJson.getString("contentCFI"),
 							unixtime);
@@ -949,7 +944,7 @@ public class WebViewActivity extends FragmentActivity implements
 					JSONArray highlights = new JSONArray();
 					if (annotationID == -1) {
 					} else {
-						DBCursor hc = dbHelper.getHighlight(1, annotationID);
+						DBCursor hc = dbHelper.getHighlight(LoginActivity.bookID, annotationID);
 						JSONObject hld = new JSONObject();
 						hld.put("spineIdRef", hc.getColIDRef());
 						hld.put("cfi", hc.getColCFI());
@@ -964,7 +959,7 @@ public class WebViewActivity extends FragmentActivity implements
 					postDict.put("highlights", highlights);
 					String patch = postDict.toString();
 					String patch2 = patch.replace("\\/", "/");
-					URL url = new URL("https://read.biblemesh.com/users/"+LoginActivity.userID+"/books/1.json");
+					URL url = new URL("https://read.biblemesh.com/users/"+LoginActivity.userID+"/books/"+LoginActivity.bookID+".json");
 					httpConn = (HttpURLConnection) url.openConnection();
 					httpConn.setDoOutput(true);
 
@@ -1043,14 +1038,14 @@ public class WebViewActivity extends FragmentActivity implements
 				@Override
 				public void run() {
 					DBHelper dbHelper = new DBHelper(WebViewActivity.this);
-					DBCursor cursor = dbHelper.getHighlights(1);//// FIXME: 29/01/2017
+					DBCursor cursor = dbHelper.getHighlights(LoginActivity.bookID);
 					for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
 						cursor.moveToPosition(rowNum);
 						if (idref.equals(cursor.getColIDRef())) {
 
 							Integer random = (int) (Math.random() * 1000000 + 1);
 							dbHelper.updateHighlight(
-									cursor.getColID(), 1, cursor.getColColor(), cursor.getColNote(), cursor.getColLastUpdated(), random);
+									cursor.getColID(), LoginActivity.bookID, cursor.getColColor(), cursor.getColNote(), cursor.getColLastUpdated(), random);
 							mReadiumJSApi.addHighlight(cursor.getColIDRef(), cursor.getColCFI(), random);
 						} else {
 							Log.v("webview", "skip as idref not matched");
@@ -1074,33 +1069,19 @@ public class WebViewActivity extends FragmentActivity implements
 
 				DBHelper dbHelper = new DBHelper(WebViewActivity.this);
 				final Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
-				dbHelper.insertHighlight(1, selidref, selcfi, 1, "", unixtime, random);//// FIXME: 29/01/2017
+				dbHelper.insertHighlight(LoginActivity.bookID, selidref, selcfi, 1, "", unixtime, random);
 
 				runOnUiThread(new Runnable() {
 					@Override
 					public void run() {
-						/*DBHelper dbHelper = new DBHelper(WebViewActivity.this);
-						DBCursor cursor = dbHelper.getHighlights(1);//// FIXME: 29/01/2017
-						for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
-							cursor.moveToPosition(rowNum);*/
-							//if (idref.equals(cursor.getColIDRef())) {
-								mReadiumJSApi.addHighlight(selidref, selcfi, random);
-								mReadiumJSApi.updateLocation(unixtime, random, false);
-							//} else {
-							//	Log.v("webview", "skip as idref not matched");
-							//}
-						//}
+						mReadiumJSApi.addHighlight(selidref, selcfi, random);
+						mReadiumJSApi.updateLocation(unixtime, random, false);
 					}
 				});
 
 			} catch (JSONException e) {
 				Log.v("webview", e.getMessage());
 			}
-			/*try {
-				JSONObject selectionJson = new JSONObject(response);
-			} catch(JSONException e) {
-				Log.v("webview", e.getMessage());
-			}*/
 		}
 
 /*
@@ -1166,8 +1147,8 @@ public class WebViewActivity extends FragmentActivity implements
 			// needs to be extracted
 
 			final DBHelper dbHelper = new DBHelper(WebViewActivity.this);
-			final DBCursor cursor = dbHelper.getHighlight(1, Integer.parseInt(id));
-			final DBCursor cursor2 = dbHelper.getLocation(1);
+			final DBCursor cursor = dbHelper.getHighlight(LoginActivity.bookID, Integer.parseInt(id));
+			final DBCursor cursor2 = dbHelper.getLocation(LoginActivity.bookID);
 
 			final EditText editText = new EditText(WebViewActivity.this);
 			editText.setLines(3);
@@ -1203,7 +1184,7 @@ public class WebViewActivity extends FragmentActivity implements
 					new DialogInterface.OnClickListener() {
 						@Override
 						public void onClick(DialogInterface dialog, int which) {
-							dbHelper.updateHighlight(cursor.getColID(), 1, cursor.getColColor(), editText.getText().toString(), cursor.getColLastUpdated(), Integer.parseInt(id));
+							dbHelper.updateHighlight(cursor.getColID(), LoginActivity.bookID, cursor.getColColor(), editText.getText().toString(), cursor.getColLastUpdated(), Integer.parseInt(id));
 
 
 							runOnUiThread(new Runnable() {
@@ -1249,10 +1230,7 @@ public class WebViewActivity extends FragmentActivity implements
 		switch (item.getItemId()) {
 			case R.id.highlight_item:
 			{
-				//Integer random = (int) (Math.random() * 1000000 + 1);
 				mReadiumJSApi.highlightSelection();
-				//DBHelper dbhelper = new DBHelper(this);
-				//dbhelper.updateHighlight();
 			}
 			break;
 			default:

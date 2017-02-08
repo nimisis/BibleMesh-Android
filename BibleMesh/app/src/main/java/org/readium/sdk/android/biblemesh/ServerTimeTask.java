@@ -35,7 +35,6 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
 			
 			@Override
 			public void onCancel(DialogInterface dialog) {
-				// TODO Auto-generated method stub
 				Log.v("progress", "cancel");
 			}
 		});*/
@@ -96,7 +95,6 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
     protected void onPostExecute(Long result) {
     	Log.v("ServerTimeTask", "onPostExecute");
 
-	    //// FIXME: 03/01/2017 still need to request titles
 	    Intent intent = new Intent(activity.getApplicationContext(),
 			    ContainerList.class);
 	    activity.startActivity(intent);

@@ -29,8 +29,8 @@ import java.util.TimeZone;
 public class LoginActivity extends Activity {
 
 	static public Integer userID;
+	static public Integer bookID;
 	static public Long serverTimeOffset;
-	//public LLocation llocation;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -40,6 +40,7 @@ public class LoginActivity extends Activity {
 		//setSupportActionBar(toolbar);
 
 		userID = 1;
+		bookID = 0;
 		serverTimeOffset = 0L;
 //		//llocation = new LLocation();
 

@@ -39,7 +39,6 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Integer> {
 	@Override
 	protected void onCancelled() {
 		Log.v("DownloadTask", "onCancelled");
-		//dbHelper
 		//// FIXME: 26/01/2017 reset downloadStatus
 	}
 		
