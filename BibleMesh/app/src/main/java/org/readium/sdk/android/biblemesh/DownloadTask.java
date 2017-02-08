@@ -8,6 +8,7 @@ import android.content.DialogInterface.OnCancelListener;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.util.Log;
+import android.widget.ListView;
 
 /*import org.apache.http.Header;
 import org.apache.http.HttpResponse;
@@ -174,8 +175,10 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Integer> {
     protected void onPostExecute(Integer result) {
     	Log.v("DownloadTask", "onPostExecute");
 
-    	dialog.dismiss();
-    	//DownloadsAdapter va = (DownloadsAdapter) activity.getListView().getAdapter();
-    	//va.notifyDataSetChanged();
+	    ListView l = (ListView) activity.findViewById(R.id.containerList);
+    	BookAdapter va = (BookAdapter) l.getAdapter();
+    	va.notifyDataSetChanged();
+
+	    dialog.dismiss();
     }
 }
