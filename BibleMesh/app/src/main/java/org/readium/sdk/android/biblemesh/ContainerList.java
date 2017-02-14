@@ -86,7 +86,6 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 	}
 
 	private Context context;
-	//private final String testPath = "epubtest";
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {

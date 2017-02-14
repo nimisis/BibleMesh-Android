@@ -12,6 +12,9 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class LoginWebViewActivity extends Activity {
 
 	WebView mWebview;
@@ -76,7 +79,9 @@ public class LoginWebViewActivity extends Activity {
 			//MainActivity.this.finish();
 			finish();
 		} else {
-			mWebview.loadUrl("https://read.biblemesh.com/epub_content/epub_library.json");
+			Map<String, String> extraHeaders = new HashMap<String, String>();
+			extraHeaders.put("App-Request", "true");
+			mWebview.loadUrl("https://read.biblemesh.com/epub_content/epub_library.json", extraHeaders);
 		}
 		//getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 	}
