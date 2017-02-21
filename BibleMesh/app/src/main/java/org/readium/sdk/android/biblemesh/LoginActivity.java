@@ -9,6 +9,8 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.webkit.CookieManager;
+import android.webkit.CookieSyncManager;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
@@ -21,6 +23,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.CookieHandler;
+//import java.net.CookieManager;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Calendar;
@@ -43,6 +47,15 @@ public class LoginActivity extends Activity {
 		bookID = 0;
 		serverTimeOffset = 0L;
 //		//llocation = new LLocation();
+
+		//CookieHandler.setDefault(new CookieManager()); // Apparently for some folks this line works already, for me on Android 17 it does not.
+		//CookieSyncManager.createInstance(yourContext);
+		CookieManager cookieManager = CookieManager.getInstance();
+		/*if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+			CookieSyncManager.createInstance(this);
+		}*/
+		cookieManager.setAcceptCookie(true);
+
 
 		PackageInfo pInfo = null;
 		try {
@@ -93,6 +106,13 @@ public class LoginActivity extends Activity {
 
 				DBHelper dbHelper = new DBHelper(getBaseContext());
 				DBCursor cursor = dbHelper.getLocations(userID);
+
+				/*for(int i = 0; i < cursor.getCount(); i++) {
+					Log.v("locs", "bookID:"+cursor.getColBookID()+" booktitle:"+cursor.getColTitle());
+					cursor.moveToNext();
+				}
+				cursor.moveToFirst();*/
+
 				Log.v("direct", String.format("Got %d locations", cursor.getCount()));
 				if (cursor.getCount() == 0) {
 					cursor = null;
@@ -105,6 +125,8 @@ public class LoginActivity extends Activity {
 						Integer bookID = jsonobject.getInt("id");
 						while ((cursor != null) && (cursor.getColBookID() < bookID)) {
 							//delete
+							dbHelper.deleteLocation(cursor.getColBookID());
+							//fix delete all associated highlights too.
 							if (!cursor.moveToNext()) {
 								cursor = null;
 							}
@@ -122,7 +144,6 @@ public class LoginActivity extends Activity {
 							insertNew = true;
 						}
 						if (insertNew) {
-
 							Log.v("db", "inserting new location");
 							dbHelper.insertLocation(bookID, userID);
 							//search books for this bookid

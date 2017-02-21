@@ -3,8 +3,8 @@ package org.readium.sdk.android.biblemesh;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.util.Log;
+import android.webkit.CookieManager;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -16,17 +16,17 @@ import java.net.URL;
 import java.util.Calendar;
 import java.util.TimeZone;
 
-public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
+public class LogoutTask extends AsyncTask<Integer, Integer, Long> {
 
-	private LoginActivity activity;
+	private ContainerList activity;
 
-	public ServerTimeTask(LoginActivity activity) {
+	public LogoutTask(ContainerList activity) {
 		this.activity = activity;
 	}
 
 	@Override
 	protected void onCancelled() {
-		Log.v("ServerTimeTask", "onCancelled");
+		Log.v("LogoutTask", "onCancelled");
 	}
 		
 	@Override
@@ -44,21 +44,27 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
         long totalSize = 0;
 		HttpURLConnection httpConn = null;
 		try {
-			URL url = new URL("https://read.biblemesh.com/currenttime.json");
-			httpConn = (HttpURLConnection) url.openConnection();
+			String url = "https://read.biblemesh.com/logout";
+			URL resourceUrl = new URL(url);
+			httpConn = (HttpURLConnection) resourceUrl.openConnection();
 			//httpConn.setDoOutput(true);
 			httpConn.setRequestMethod("GET");
 			//httpConn.setUseCaches(false);
 			//httpConn.setAllowUserInteraction(false);
 			//httpConn.setConnectTimeout(timeout);
 			//httpConn.setReadTimeout(timeout);
-			
-			//// TODO: 21/02/2017 cookies 
+
+			String cookies = CookieManager.getInstance().getCookie(url);
+			if (cookies != null) {
+				Log.v("getbookdatatask", "have cookies");
+				httpConn.setRequestProperty("Cookie", cookies);
+			}
+
 			httpConn.connect();
 
 			int responseCode = httpConn.getResponseCode();
 
-			Log.v("servertime", "Response: "+responseCode);
+			Log.v("logout", "Response: "+responseCode);
 
 			// always check HTTP response code first
 			if (responseCode == HttpURLConnection.HTTP_OK) {
@@ -69,20 +75,18 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
 					sb.append(line + "\n");
 				}
 				br.close();
-				Log.v("login", "servertime:"+sb.toString());
-				JSONObject jsonObject = new JSONObject(sb.toString());
+				Log.v("login", "logout:"+sb.toString());
+				/*JSONObject jsonObject = new JSONObject(sb.toString());
 				Long serverTime = jsonObject.getLong("currentServerTime");
 				Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis();
 				Log.v("login", "diff2: " + (serverTime - unixtime));
-				activity.serverTimeOffset = serverTime - unixtime;
+				activity.serverTimeOffset = serverTime - unixtime;*/
 			} else {
 				System.out.println("Server replied HTTP code: " + responseCode);
 			}
 		} catch (IOException e) {
 			Log.d("err", "Error: " + e);
 			//vid[0].downloadStatus = 0;
-		} catch (JSONException e) {
-			Log.v("json", e.getMessage());
 		} finally {
 			if (httpConn != null) {
 				httpConn.disconnect();
@@ -95,10 +99,11 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
     }
 
     protected void onPostExecute(Long result) {
-    	Log.v("ServerTimeTask", "onPostExecute");
+    	Log.v("LogoutTask", "onPostExecute");
 
-	    Intent intent = new Intent(activity.getApplicationContext(),
+	    /*Intent intent = new Intent(activity.getApplicationContext(),
 			    ContainerList.class);
-	    activity.startActivity(intent);
+	    activity.startActivity(intent);*/
+	    activity.finish();
     }
 }

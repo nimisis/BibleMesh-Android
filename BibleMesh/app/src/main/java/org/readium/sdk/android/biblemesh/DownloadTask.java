@@ -8,6 +8,7 @@ import android.content.DialogInterface.OnCancelListener;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.util.Log;
+import android.webkit.CookieManager;
 import android.widget.ListView;
 
 /*import org.apache.http.Header;
@@ -88,6 +89,15 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Integer> {
 					resourceUrl = new URL(url);
 					httpConn = (HttpURLConnection) resourceUrl.openConnection();
 					httpConn.setRequestMethod("GET");
+
+					String cookies = CookieManager.getInstance().getCookie(url);
+					if (cookies != null) {
+						Log.v("downloadtask", "have cookies");
+						httpConn.setRequestProperty("Cookie", cookies);
+					}
+					// Starts the query
+					//conn.connect();
+
 					//httpConn.setRequestProperty("Content-length", "0");
 					//httpConn.setUseCaches(false);
 					//httpConn.setAllowUserInteraction(false);

@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.util.Log;
+import android.webkit.CookieManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -74,14 +75,23 @@ public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 			//DBCursor c = dbHelper.getHighlights(vid[0].bookID, LoginActivity.userID);
 			//Log.v("background" , "num highlights:"+ c.getCount());
 			try {
-		        URL url = new URL("https://read.biblemesh.com/users/"+LoginActivity.userID+"/books/"+vid[0].bookID.toString()+".json");
-		        httpConn = (HttpURLConnection) url.openConnection();
+		        String url = "https://read.biblemesh.com/users/"+LoginActivity.userID+"/books/"+vid[0].bookID.toString()+".json";
+
+				URL resourceUrl = new URL(url);
+				httpConn = (HttpURLConnection) resourceUrl.openConnection();
 		        httpConn.setRequestMethod("GET");
 		        //httpConn.setRequestProperty("Content-length", "0");
 		        //httpConn.setUseCaches(false);
 		        //httpConn.setAllowUserInteraction(false);
 		        //httpConn.setConnectTimeout(timeout);
 		        //httpConn.setReadTimeout(timeout);
+
+				String cookies = CookieManager.getInstance().getCookie(url);
+				if (cookies != null) {
+					Log.v("getbookdatatask", "have cookies");
+					httpConn.setRequestProperty("Cookie", cookies);
+				}
+
 		        httpConn.connect();
 		        int responseCode = httpConn.getResponseCode();
 

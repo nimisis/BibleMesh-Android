@@ -124,6 +124,14 @@ public class DBHelper extends SQLiteOpenHelper {
 		}
 	}
 
+	public void deleteLocation(Integer id) {
+		try {
+			getWritableDatabase().execSQL("DELETE from locations where bookID = ?", new Object[]{id});
+		} catch (SQLException e) {
+			Log.e("removing book", e.toString());
+		}
+	}
+
 	/*public void removeHighlights(Integer bookID) {
 		try {
 			getWritableDatabase().execSQL("DELETE from highlights where bookID = ? and userID = ?", new Object[]{bookID, LoginActivity.userID});

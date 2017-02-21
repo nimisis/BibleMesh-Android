@@ -49,6 +49,8 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
@@ -86,6 +88,13 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 	}
 
 	private Context context;
+
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		getMenuInflater().inflate(R.menu.container, menu);
+
+		return true;
+	}
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -218,6 +227,19 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 
 		new GetBookDataTask(ContainerList.this, dbHelper, fstr).execute(ep);
 
+	}
+
+	public boolean onMenuItemSelected(int featureId, MenuItem item) {
+		int itemId = item.getItemId();
+		switch (itemId) {
+			case R.id.logout:
+				Log.v("container", "logout");
+
+				new LogoutTask(ContainerList.this).execute(1);
+				//finish();
+				return true;
+		}
+		return false;
 	}
 
 	final int REQUEST_WRITE_EXTERNAL_STORAGE = 1;

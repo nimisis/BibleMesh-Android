@@ -90,6 +90,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -959,8 +960,9 @@ public class WebViewActivity extends FragmentActivity implements
 					postDict.put("highlights", highlights);
 					String patch = postDict.toString();
 					String patch2 = patch.replace("\\/", "/");
-					URL url = new URL("https://read.biblemesh.com/users/"+LoginActivity.userID+"/books/"+LoginActivity.bookID+".json");
-					httpConn = (HttpURLConnection) url.openConnection();
+					String url = "https://read.biblemesh.com/users/"+LoginActivity.userID+"/books/"+LoginActivity.bookID+".json";
+					URL resourceUrl = new URL(url);
+					httpConn = (HttpURLConnection) resourceUrl.openConnection();
 					httpConn.setDoOutput(true);
 
 					if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.JELLY_BEAN_MR2) {
@@ -980,6 +982,14 @@ public class WebViewActivity extends FragmentActivity implements
 					//httpConn.setAllowUserInteraction(false);
 					//httpConn.setConnectTimeout(timeout);
 					//httpConn.setReadTimeout(timeout);
+
+
+					String cookies = CookieManager.getInstance().getCookie(url);
+					if (cookies != null) {
+						Log.v("getbookdatatask", "have cookies");
+						httpConn.setRequestProperty("Cookie", cookies);
+					}
+
 					httpConn.connect();
 
 					OutputStream os = httpConn.getOutputStream();
