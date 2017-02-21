@@ -1,13 +1,10 @@
 package org.readium.sdk.android.biblemesh;
 
 import android.content.Context;
-import android.content.Intent;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
-
-import java.math.BigInteger;
 
 /**
  * Created by admin on 28/11/2016.

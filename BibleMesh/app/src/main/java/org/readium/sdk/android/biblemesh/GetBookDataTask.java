@@ -1,36 +1,19 @@
 package org.readium.sdk.android.biblemesh;
 
-import android.app.Activity;
-import android.app.ProgressDialog;
-import android.content.DialogInterface;
-import android.content.DialogInterface.OnCancelListener;
-import android.content.Intent;
 import android.os.AsyncTask;
-import android.os.Environment;
 import android.util.Log;
 import android.webkit.CookieManager;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Stack;
 
 import org.json.JSONException;
-import org.readium.sdk.android.EPub3;
-import org.readium.sdk.android.Container;
-import org.readium.sdk.android.biblemesh.model.BookmarkDatabase;
-import org.readium.sdk.android.SdkErrorHandler;
-import org.readium.sdk.android.biblemesh.model.OpenPageRequest;
 
 public class GetBookDataTask extends AsyncTask<EPubTitle, Integer, Long> {
 

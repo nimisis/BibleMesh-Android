@@ -17,7 +17,7 @@ import java.util.Map;
 
 public class LoginWebViewActivity extends Activity {
 
-	WebView mWebview;
+	private WebView mWebview;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {

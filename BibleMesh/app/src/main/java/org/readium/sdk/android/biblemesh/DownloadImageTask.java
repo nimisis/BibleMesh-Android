@@ -3,22 +3,18 @@ package org.readium.sdk.android.biblemesh;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
-import android.os.Environment;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.widget.ImageView;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
 public class DownloadImageTask extends AsyncTask<String, Void, Bitmap> {
-	private static final int BUFFER_SIZE = 4096;
-		  ImageView bmImage;
-			EPubTitle book;
+	private ImageView bmImage;
+	private EPubTitle book;
 		  
 		  public DownloadImageTask(EPubTitle book, ImageView bmImage) {
 		      this.bmImage = bmImage;
@@ -57,8 +53,6 @@ public class DownloadImageTask extends AsyncTask<String, Void, Bitmap> {
 						  Log.v("downloadimagetask", "have cookies");
 						  httpConn.setRequestProperty("Cookie", cookies);
 					  }
-					  // Starts the query
-					  //conn.connect();
 
 					  //httpConn.setRequestProperty("Content-length", "0");
 					  //httpConn.setUseCaches(false);
@@ -103,7 +97,7 @@ public class DownloadImageTask extends AsyncTask<String, Void, Bitmap> {
 		  }
 
 		  protected void onPostExecute(Bitmap result) {
-			  Log.v("download", "postexecute");
+			  Log.v("downloadimage", "postexecute");
 		      bmImage.setImageBitmap(result);
 		      if (book != null) {
 		    	  book.cover = result;

@@ -6,16 +6,14 @@ import android.database.sqlite.SQLiteCursorDriver;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQuery;
 
-import java.math.BigInteger;
-
 /**
  * Created by admin on 28/11/2016.
  */
 
 public class DBCursor extends SQLiteCursor {
 
-	public DBCursor(SQLiteDatabase db, SQLiteCursorDriver driver,
-	                String editTable, SQLiteQuery query) {
+	private DBCursor(SQLiteDatabase db, SQLiteCursorDriver driver,
+	                 String editTable, SQLiteQuery query) {
 		super(db, driver, editTable, query);
 	}
 

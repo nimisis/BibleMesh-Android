@@ -14,6 +14,5 @@ public class Highlight {
 	public Integer color;
 
 	public Highlight() {
-
 	}
 }

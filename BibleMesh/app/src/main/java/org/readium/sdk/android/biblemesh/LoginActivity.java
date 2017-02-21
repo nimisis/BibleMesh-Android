@@ -10,25 +10,14 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.webkit.CookieManager;
-import android.webkit.CookieSyncManager;
 import android.widget.TextView;
-import android.widget.Toast;
-import android.widget.Toolbar;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.CookieHandler;
 //import java.net.CookieManager;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.Calendar;
-import java.util.TimeZone;
+
 
 public class LoginActivity extends Activity {
 

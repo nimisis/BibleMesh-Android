@@ -25,8 +25,6 @@ package org.readium.sdk.android.biblemesh;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Stack;
 
@@ -42,12 +40,10 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.database.SQLException;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -60,7 +56,6 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 
 import com.google.analytics.tracking.android.EasyTracker;
-import com.google.analytics.tracking.android.MapBuilder;
 
 //import com.google.android.gms.analytics.GoogleAnalytics;
 
@@ -221,8 +216,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 		EPub3.setCachePath(getCacheDir().getAbsolutePath());
 	}
 
-	void refreshData(DBHelper dbHelper, EPubTitle ep, String fstr) {
-		//DBHelper dbHelper = new DBHelper(getApplicationContext());
+	private void refreshData(DBHelper dbHelper, EPubTitle ep, String fstr) {
 		DBCursor cursor = dbHelper.getHighlights(ep.bookID);
 
 		new GetBookDataTask(ContainerList.this, dbHelper, fstr).execute(ep);
@@ -242,9 +236,9 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 		return false;
 	}
 
-	final int REQUEST_WRITE_EXTERNAL_STORAGE = 1;
+	private final int REQUEST_WRITE_EXTERNAL_STORAGE = 1;
 
-	void requestPermission(final Context context){
+	private void requestPermission(final Context context){
 		if(shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
 			// Provide an additional rationale to the user if the permission was not granted
 			// and the user would benefit from additional context for the use of the permission.
@@ -282,7 +276,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 							Toast.LENGTH_SHORT).show();
 					super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 				}
-				return;
+				//return;
 			}
 		}
 	}

@@ -1,20 +1,14 @@
 package org.readium.sdk.android.biblemesh;
 
-import android.content.Intent;
 import android.os.AsyncTask;
 import android.util.Log;
 import android.webkit.CookieManager;
-
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Calendar;
-import java.util.TimeZone;
 
 public class LogoutTask extends AsyncTask<Integer, Integer, Long> {
 
