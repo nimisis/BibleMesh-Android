@@ -39,7 +39,7 @@ public class LoginWebViewActivity extends Activity {
 				Log.v("authtest", token);
 				token = token.replace("<pre style=\"word-wrap: break-word; white-space: pre-wrap;\">", "");
 				token = token.replace("</pre>", "");
-				if (token.startsWith("[{")) {
+				if (token.startsWith("{\"userInfo")) {
 					Log.v("authtest", "got token, finishing...");
 
 					Bundle conData = new Bundle();
@@ -81,7 +81,8 @@ public class LoginWebViewActivity extends Activity {
 		} else {
 			Map<String, String> extraHeaders = new HashMap<String, String>();
 			extraHeaders.put("App-Request", "true");
-			mWebview.loadUrl("https://read.biblemesh.com/epub_content/epub_library.json", extraHeaders);
+			//mWebview.loadUrl("https://read.biblemesh.com/epub_content/epub_library.json", extraHeaders);
+			mWebview.loadUrl("https://read.biblemesh.com/usersetup.json", extraHeaders);
 		}
 		//getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 	}

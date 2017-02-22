@@ -1,6 +1,7 @@
 package org.readium.sdk.android.biblemesh;
 
 import android.os.AsyncTask;
+import android.os.Build;
 import android.util.Log;
 import android.webkit.CookieManager;
 
@@ -50,7 +51,7 @@ public class LogoutTask extends AsyncTask<Integer, Integer, Long> {
 
 			String cookies = CookieManager.getInstance().getCookie(url);
 			if (cookies != null) {
-				Log.v("getbookdatatask", "have cookies");
+				Log.v("logouttask", "have cookies");
 				httpConn.setRequestProperty("Cookie", cookies);
 			}
 
@@ -62,6 +63,8 @@ public class LogoutTask extends AsyncTask<Integer, Integer, Long> {
 
 			// always check HTTP response code first
 			if (responseCode == HttpURLConnection.HTTP_OK) {
+
+
 				BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream()));
 				StringBuilder sb = new StringBuilder();
 				String line;
@@ -70,6 +73,13 @@ public class LogoutTask extends AsyncTask<Integer, Integer, Long> {
 				}
 				br.close();
 				Log.v("login", "logout:"+sb.toString());
+
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+					CookieManager.getInstance().removeAllCookies(null);
+				} else {
+					CookieManager.getInstance().removeAllCookie();
+				}
+
 				/*JSONObject jsonObject = new JSONObject(sb.toString());
 				Long serverTime = jsonObject.getLong("currentServerTime");
 				Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis();

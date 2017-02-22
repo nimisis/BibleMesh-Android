@@ -43,7 +43,8 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
         long totalSize = 0;
 		HttpURLConnection httpConn = null;
 		try {
-			URL url = new URL("https://read.biblemesh.com/currenttime.json");
+			//URL url = new URL("https://read.biblemesh.com/currenttime.json");//todo
+			URL url = new URL("https://read.biblemesh.com/usersetup.json");
 			httpConn = (HttpURLConnection) url.openConnection();
 			//httpConn.setDoOutput(true);
 			httpConn.setRequestMethod("GET");

@@ -17,6 +17,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 //import java.net.CookieManager;
+import java.io.IOException;
+import java.util.Calendar;
+import java.util.TimeZone;
 
 
 public class LoginActivity extends Activity {
@@ -92,73 +95,22 @@ public class LoginActivity extends Activity {
 				Log.v("result", "no token");
 			} else {
 				String result = res.getString("token");
-
-				DBHelper dbHelper = new DBHelper(getBaseContext());
-				DBCursor cursor = dbHelper.getLocations(userID);
-
-				/*for(int i = 0; i < cursor.getCount(); i++) {
-					Log.v("locs", "bookID:"+cursor.getColBookID()+" booktitle:"+cursor.getColTitle());
-					cursor.moveToNext();
-				}
-				cursor.moveToFirst();*/
-
-				Log.v("direct", String.format("Got %d locations", cursor.getCount()));
-				if (cursor.getCount() == 0) {
-					cursor = null;
-				}
-
 				try {
-					JSONArray jArray = new JSONArray(result);
-					for (int i = 0; i < jArray.length(); i++) {
-						JSONObject jsonobject = jArray.getJSONObject(i);
-						Integer bookID = jsonobject.getInt("id");
-						while ((cursor != null) && (cursor.getColBookID() < bookID)) {
-							//delete
-							dbHelper.deleteLocation(cursor.getColBookID());
-							//fix delete all associated highlights too.
-							if (!cursor.moveToNext()) {
-								cursor = null;
-							}
-						}
-						Boolean insertNew = false;
-						if (cursor != null) {
-							if (cursor.getColBookID() == bookID) {
-								if (!cursor.moveToNext()) {
-									cursor = null;
-								}
-							} else {
-								insertNew = true;
-							}
-						} else {
-							insertNew = true;
-						}
-						if (insertNew) {
-							Log.v("db", "inserting new location");
-							dbHelper.insertLocation(bookID, userID);
-							//search books for this bookid
-							DBCursor cursor2 = dbHelper.getBook(bookID);
-							//if does not exist, insert
-							Integer cnt = cursor2.getCount();
-							if (cnt == 0) {
-								Log.v("db", "inserting new book");
-								String title = jsonobject.getString("title");
-								String author = jsonobject.getString("author");
-								String coverHref = jsonobject.getString("coverHref");
-								String rootURL = jsonobject.getString("rootUrl");
-								String updatedAtStr = jsonobject.getString("updated_at");
-								dbHelper.insertBook(bookID, title, author, coverHref, rootURL, updatedAtStr);
-							} else if (cnt > 1) {
-								//fix assert
-							}
-						}
-					}
+					JSONObject jsonObject = new JSONObject(result);
+					Long serverTime = jsonObject.getLong("currentServerTime");
+					Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis();
+					Log.v("login", "diff2: " + (serverTime - unixtime));
+					serverTimeOffset = serverTime - unixtime;
+					JSONObject jsonObject2 = jsonObject.getJSONObject("userInfo");
+					userID = jsonObject2.getInt("id");
+					Log.v("login", "id is "+userID);
 				} catch (JSONException e) {
 					Log.v("json", e.getMessage());
 				}
 			}
 
 			Integer dummy = 1;
-			new ServerTimeTask(LoginActivity.this).execute(dummy);
+			new LibraryTask(LoginActivity.this).execute(dummy);
 		}
 	}
 }
