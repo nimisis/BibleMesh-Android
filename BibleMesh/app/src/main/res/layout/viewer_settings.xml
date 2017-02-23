@@ -44,13 +44,13 @@
                 android:layout_marginBottom="8dp" />
 
             <LinearLayout
-                android:orientation="horizontal"
+                android:orientation="vertical"
                 android:layout_width="fill_parent"
                 android:layout_height="wrap_content">
 
                 <LinearLayout
                     android:orientation="vertical"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_weight="2">
 
@@ -100,7 +100,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginLeft="4dp">
+                    android:layout_marginLeft="4dp" android:visibility="invisible">
 
                     <TextView
                         style="?android:attr/listSeparatorTextViewStyle"

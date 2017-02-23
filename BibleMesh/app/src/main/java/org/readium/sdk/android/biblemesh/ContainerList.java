@@ -229,8 +229,36 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 			case R.id.logout:
 				Log.v("container", "logout");
 
-				new LogoutTask(ContainerList.this).execute(1);
-				//finish();
+				AlertDialog.Builder alertBuilder = new AlertDialog.Builder(this);
+
+				alertBuilder.setTitle("Log out");
+				alertBuilder.setMessage("Are you sure you want to log out?");
+
+				alertBuilder.setCancelable(false);
+
+				alertBuilder.setPositiveButton("Yes",
+						new DialogInterface.OnClickListener() {
+							@Override
+							public void onClick(DialogInterface dialog, int which) {
+								new LogoutTask(ContainerList.this).execute(1);
+								dialog.dismiss();
+							}
+						}
+				);
+				alertBuilder.setNegativeButton("Cancel",
+						new DialogInterface.OnClickListener() {
+							@Override
+							public void onClick(DialogInterface dialog, int which) {
+								dialog.cancel();
+							}
+						}
+				);
+
+				AlertDialog alert = alertBuilder.create();
+				alert.setCanceledOnTouchOutside(false);
+
+				alert.show(); //async!
+
 				return true;
 		}
 		return false;

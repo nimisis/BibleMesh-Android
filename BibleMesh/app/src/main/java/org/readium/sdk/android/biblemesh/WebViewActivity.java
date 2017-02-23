@@ -70,6 +70,7 @@ import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.v4.app.DialogFragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
@@ -454,9 +455,9 @@ public class WebViewActivity extends FragmentActivity implements
 	private void showSettings() {
 		FragmentManager fm = getSupportFragmentManager();
 		FragmentTransaction fragmentTransaction = fm.beginTransaction();
-		/*DialogFragment dialog = new ViewerSettingsDialog(this, mViewerSettings);
+		DialogFragment dialog = new ViewerSettingsDialog(this, mViewerSettings);
 		dialog.show(fm, "dialog");
-		fragmentTransaction.commit();*/
+		fragmentTransaction.commit();
 	}
 
 	@Override

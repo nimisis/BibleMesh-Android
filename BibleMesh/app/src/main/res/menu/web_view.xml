@@ -36,11 +36,12 @@
         android:id="@+id/settings"
         android:orderInCategory="100"
         android:showAsAction="ifRoom"
-        android:title="@string/settings"/>
+        android:title="@string/settingsicon"/>
 
 	<item
 		android:id="@+id/add_bookmark"
 		android:orderInCategory="100"
 		android:showAsAction="ifRoom"
-		android:title="@string/add_bookmark"/>
+		android:title="@string/add_bookmark"
+		android:visible="false" />
 </menu>

@@ -62,13 +62,11 @@ public class ViewerSettingsDialog extends DialogFragment {
 	private OnViewerSettingsChange mListener;
 
 	private ViewerSettings mOriginalSettings;
-    public ViewerSettingsDialog() {
 
-    }
-	/*public ViewerSettingsDialog(OnViewerSettingsChange listener, ViewerSettings originalSettings) {
+    public ViewerSettingsDialog(OnViewerSettingsChange listener, ViewerSettings originalSettings) {
 		mListener = listener;
 		mOriginalSettings = originalSettings;
-	}*/
+	}
 
 	@Override
 	public Dialog onCreateDialog(
