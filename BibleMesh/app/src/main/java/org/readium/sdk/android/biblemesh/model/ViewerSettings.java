@@ -26,7 +26,9 @@ package org.readium.sdk.android.biblemesh.model;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class ViewerSettings {
+import java.io.Serializable;
+
+public class ViewerSettings implements Serializable {
 
     public enum SyntheticSpreadMode {
         AUTO,

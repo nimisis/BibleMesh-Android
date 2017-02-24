@@ -34,6 +34,7 @@ import org.readium.sdk.android.biblemesh.model.ViewerSettings;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
+import android.os.Parcelable;
 import android.support.v4.app.DialogFragment;
 import android.os.Bundle;
 import android.util.Log;
@@ -41,6 +42,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.RadioGroup;
+
+import java.io.Serializable;
 
 /**
  * This dialog displays the viewer settings to the user.
@@ -53,7 +56,7 @@ public class ViewerSettingsDialog extends DialogFragment {
 	/**
 	 * Interface to notify the listener when a viewer settings have been changed.
 	 */
-	public interface OnViewerSettingsChange {
+	public interface OnViewerSettingsChange extends Serializable {
 		public void onViewerSettingsChange(ViewerSettings settings);
 	}
 
@@ -63,14 +66,24 @@ public class ViewerSettingsDialog extends DialogFragment {
 
 	private ViewerSettings mOriginalSettings;
 
-    public ViewerSettingsDialog(OnViewerSettingsChange listener, ViewerSettings originalSettings) {
-		mListener = listener;
-		mOriginalSettings = originalSettings;
+	public ViewerSettingsDialog() {};
+
+	public static ViewerSettingsDialog newInstance(OnViewerSettingsChange listener, ViewerSettings originalSettings) {
+		ViewerSettingsDialog fragment = new ViewerSettingsDialog();
+		Bundle args = new Bundle();
+		args.putSerializable("listener", listener);
+		args.putSerializable("settings", originalSettings);
+		fragment.setArguments(args);
+		return fragment;
 	}
 
 	@Override
 	public Dialog onCreateDialog(
 			Bundle savedInstanceState) {
+
+        mListener = (OnViewerSettingsChange) getArguments().getSerializable("listener");
+        mOriginalSettings = (ViewerSettings) getArguments().getSerializable("settings");
+
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
 
         LayoutInflater inflater = getActivity().getLayoutInflater();
