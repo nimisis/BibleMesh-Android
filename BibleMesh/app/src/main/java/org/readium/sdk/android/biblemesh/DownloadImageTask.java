@@ -82,6 +82,7 @@ public class DownloadImageTask extends AsyncTask<String, Void, Bitmap> {
 					  mIcon11 = BitmapFactory.decodeStream(inputStream);
 					  inputStream.close();
 				  } else {
+					  Log.v("download image", "response:"+responseCode+" for "+url);
 					  //System.out.println("No file to download. Server replied HTTP code: " + responseCode);
 				  }
 

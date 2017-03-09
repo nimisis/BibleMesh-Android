@@ -72,9 +72,11 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
 			    if (frontBooks.get(position).coverHref != null) {
 				    if (frontBooks.get(position).coverHref.equals("")) {
 				    } else {
+					    /*new DownloadImageTask(frontBooks.get(position), sqView.cover)
+							    .execute("https://read.biblemesh.com/" + frontBooks.get(position).coverHref);*/
 					    new DownloadImageTask(frontBooks.get(position), sqView.cover)
-							    .execute("https://read.biblemesh.com/" + frontBooks.get(position).coverHref);
-				    }
+							    .execute("https://read.biblemesh.com/epub_content/book_"+frontBooks.get(position).bookID.toString()+"/cover_thumbnail_created_on_import.png");
+					}
 			    }
 		    } else {
 			    sqView.cover.setImageBitmap(frontBooks.get(position).cover);

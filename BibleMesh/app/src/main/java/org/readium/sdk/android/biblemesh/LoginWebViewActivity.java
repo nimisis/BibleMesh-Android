@@ -7,6 +7,7 @@ import android.os.Bundle;
 //import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.webkit.ConsoleMessage;
+import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -39,7 +40,9 @@ public class LoginWebViewActivity extends Activity {
 				Log.v("authtest", token);
 				token = token.replace("<pre style=\"word-wrap: break-word; white-space: pre-wrap;\">", "");
 				token = token.replace("</pre>", "");
-				if (token.startsWith("{\"userInfo")) {
+				if (token.startsWith("{\"error")) {
+					Log.v("auth", "error");
+				} else if (token.startsWith("{\"userInfo")) {
 					Log.v("authtest", "got token, finishing...");
 
 					Bundle conData = new Bundle();
