@@ -3,6 +3,7 @@ package org.readium.sdk.android.biblemesh;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.util.Log;
+import android.webkit.CookieManager;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -43,9 +44,9 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
         long totalSize = 0;
 		HttpURLConnection httpConn = null;
 		try {
-			//URL url = new URL("https://read.biblemesh.com/currenttime.json");//todo
-			URL url = new URL("https://read.biblemesh.com/usersetup.json");
-			httpConn = (HttpURLConnection) url.openConnection();
+			String url = "https://read.biblemesh.com/usersetup.json";
+			URL resourceUrl = new URL(url);
+			httpConn = (HttpURLConnection) resourceUrl.openConnection();
 			//httpConn.setDoOutput(true);
 			httpConn.setRequestMethod("GET");
 			//httpConn.setUseCaches(false);
@@ -54,6 +55,12 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
 			//httpConn.setReadTimeout(timeout);
 			
 			//// TODO: 21/02/2017 cookies
+			String cookies = CookieManager.getInstance().getCookie(url);
+			if (cookies != null) {
+				Log.v("servertime", "have cookies");
+				httpConn.setRequestProperty("Cookie", cookies);
+			}
+
 			httpConn.connect();
 
 			int responseCode = httpConn.getResponseCode();
@@ -75,6 +82,14 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
 				Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis();
 				Log.v("login", "diff2: " + (serverTime - unixtime));
 				activity.serverTimeOffset = serverTime - unixtime;
+
+				JSONObject jsonObject2 = jsonObject.getJSONObject("userInfo");
+				Integer userID = jsonObject2.getInt("id");
+				Log.v("servertime", "id is "+userID);
+				if (userID != LoginActivity.userID) {
+					Log.v("servertime", "userID mismatch");
+				}
+
 			} else {
 				System.out.println("Server replied HTTP code: " + responseCode);
 			}
@@ -97,8 +112,8 @@ public class ServerTimeTask extends AsyncTask<Integer, Integer, Long> {
     protected void onPostExecute(Long result) {
     	Log.v("ServerTimeTask", "onPostExecute");
 
-	    Intent intent = new Intent(activity.getApplicationContext(),
+	    /*Intent intent = new Intent(activity.getApplicationContext(),
 			    ContainerList.class);
-	    activity.startActivity(intent);
+	    activity.startActivity(intent);*/
     }
 }

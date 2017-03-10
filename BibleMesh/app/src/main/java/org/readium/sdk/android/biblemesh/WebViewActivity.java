@@ -311,7 +311,7 @@ public class WebViewActivity extends FragmentActivity implements
 		// Load the page skeleton
 		mWebview.loadUrl(READER_SKELETON);
 		mViewerSettings = new ViewerSettings(
-				ViewerSettings.SyntheticSpreadMode.AUTO,
+				ViewerSettings.SyntheticSpreadMode.SINGLE,
 				ViewerSettings.ScrollMode.AUTO, 100, 20);
 
 		mReadiumJSApi = new ReadiumJSApi(new ReadiumJSApi.JSLoader() {
@@ -417,8 +417,8 @@ public class WebViewActivity extends FragmentActivity implements
 			case R.id.add_bookmark:
 				if (!quiet)
 					Log.d(TAG, "Add a bookmark");
-				//mReadiumJSApi.bookmarkCurrentPage();
-				mReadiumJSApi.highlightSelection();
+				mReadiumJSApi.bookmarkCurrentPage();
+				//mReadiumJSApi.highlightSelection();
 				return true;
 			/*case R.id.add_highlight:
 				if (!quiet)

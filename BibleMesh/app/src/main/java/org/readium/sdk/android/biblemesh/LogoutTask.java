@@ -4,6 +4,8 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.util.Log;
 import android.webkit.CookieManager;
+import android.webkit.CookieSyncManager;
+import android.webkit.ValueCallback;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -105,6 +107,17 @@ public class LogoutTask extends AsyncTask<Integer, Integer, Long> {
     protected void onPostExecute(Long result) {
     	Log.v("LogoutTask", "onPostExecute");
 
+	    LoginActivity.firstload = true;
+	    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+		    LoginActivity.cookieManager.removeAllCookies(new ValueCallback<Boolean>() {
+			    @Override
+			    public void onReceiveValue(Boolean value) {
+				    Log.d("removecookie", "onReceiveValue " + value);
+			    }
+		    });
+	    } else {
+		    LoginActivity.cookieManager.removeAllCookie();
+	    }
 	    /*Intent intent = new Intent(activity.getApplicationContext(),
 			    ContainerList.class);
 	    activity.startActivity(intent);*/

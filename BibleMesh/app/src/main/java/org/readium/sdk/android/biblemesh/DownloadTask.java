@@ -141,6 +141,7 @@ public class DownloadTask extends AsyncTask<EPubTitle, Integer, Integer> {
 			        InputStream inputStream = httpConn.getInputStream();
 
 			        int bytesRead = -1;
+			        totalSize = 0;
 			        byte[] buffer = new byte[BUFFER_SIZE];
 			        while ((bytesRead = inputStream.read(buffer)) != -1) {
 				        Log.v("download", "bytes:"+bytesRead);
