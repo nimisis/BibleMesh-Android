@@ -66,6 +66,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
@@ -76,7 +78,10 @@ import android.support.v4.app.DialogFragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
+import android.text.Layout;
+import android.text.SpannableStringBuilder;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.ActionMode;
 import android.view.GestureDetector;
 import android.view.Menu;
@@ -494,6 +499,15 @@ public class WebViewActivity extends FragmentActivity implements
 			mo_play.setVisible(!mIsMoPlaying);
 			mo_pause.setVisible(mIsMoPlaying);
 		}
+		Typeface face = Typeface.createFromAsset(getAssets(),"fonts/fontawesome-webfont.ttf");
+		TextDrawable faIcon = new TextDrawable(this);
+		faIcon.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+		faIcon.setTextAlign(Layout.Alignment.ALIGN_CENTER);
+		faIcon.setTextColor(Color.parseColor("#ffffff"));
+		faIcon.setTypeface(face);
+		faIcon.setText(getResources().getText(R.string.fa_cog));
+		MenuItem menuItem = menu.findItem(R.id.settings);
+		menuItem.setIcon(faIcon);
 
 		return true;
 	}

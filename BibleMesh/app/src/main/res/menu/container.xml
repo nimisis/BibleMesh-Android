@@ -1,5 +1,10 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android" >
     <item
+        android:id="@+id/refresh"
+        android:orderInCategory="90"
+        android:showAsAction="ifRoom"
+        android:title="@string/refresh"/>
+    <item
         android:id="@+id/logout"
         android:orderInCategory="100"
         android:showAsAction="ifRoom"

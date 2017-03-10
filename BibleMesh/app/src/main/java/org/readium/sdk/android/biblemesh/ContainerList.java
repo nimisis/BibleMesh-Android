@@ -40,11 +40,15 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.text.Layout;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -63,8 +67,10 @@ import com.google.analytics.tracking.android.EasyTracker;
  * @author chtian
  */
 public class ContainerList extends Activity implements SdkErrorHandler {
-
+	public BookAdapter bookListAdapter;
+	//List<EPubTitle> booksArray;
 	final private String PATH = Environment.getExternalStorageDirectory() + "/Android/data/org.readium.sdk.android.biblemesh/";
+
 	protected abstract class SdkErrorHandlerMessagesCompleted {
 		Intent m_intent = null;
 
@@ -87,6 +93,25 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		getMenuInflater().inflate(R.menu.container, menu);
+
+		Typeface face = Typeface.createFromAsset(getAssets(),"fonts/fontawesome-webfont.ttf");
+		TextDrawable faIcon = new TextDrawable(this);
+		faIcon.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+		faIcon.setTextAlign(Layout.Alignment.ALIGN_CENTER);
+		faIcon.setTextColor(Color.parseColor("#ffffff"));
+		faIcon.setTypeface(face);
+		faIcon.setText(getResources().getText(R.string.fa_refresh));
+		MenuItem menuItem = menu.findItem(R.id.refresh);
+		menuItem.setIcon(faIcon);
+
+		TextDrawable faIcon2 = new TextDrawable(this);
+		faIcon2.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+		faIcon2.setTextAlign(Layout.Alignment.ALIGN_CENTER);
+		faIcon2.setTextColor(Color.parseColor("#ffffff"));
+		faIcon2.setTypeface(face);
+		faIcon2.setText(getResources().getText(R.string.fa_logout));
+		MenuItem menuItem2 = menu.findItem(R.id.logout);
+		menuItem2.setIcon(faIcon2);
 
 		return true;
 	}
@@ -133,7 +158,8 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 			booksArray.add(ep);
 		}
 
-		BookAdapter bookListAdapter = new BookAdapter(this, booksArray, R.layout.container_list);
+		//BookAdapter
+		bookListAdapter = new BookAdapter(this, booksArray);//, R.layout.container_list);
 		view.setAdapter(bookListAdapter);
 
 		view.setOnItemClickListener(new ListView.OnItemClickListener() {
@@ -161,7 +187,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 								downloadIt = true;
 							} else {
 								LoginActivity.bookID = ep.bookID;
-								refreshData(dbHelper, ep, fstr);
+								new GetBookDataTask(ContainerList.this, dbHelper, fstr).execute(ep);
 							}
 						} else {//otherwise download it
 							Log.v("library", "download it");
@@ -216,16 +242,14 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 		EPub3.setCachePath(getCacheDir().getAbsolutePath());
 	}
 
-	private void refreshData(DBHelper dbHelper, EPubTitle ep, String fstr) {
-		DBCursor cursor = dbHelper.getHighlights(ep.bookID);
-
-		new GetBookDataTask(ContainerList.this, dbHelper, fstr).execute(ep);
-
-	}
-
 	public boolean onMenuItemSelected(int featureId, MenuItem item) {
 		int itemId = item.getItemId();
 		switch (itemId) {
+			case R.id.refresh:
+				Log.v("container", "refresh");
+				Integer dummy = 1;
+				new LibraryTask(this, false).execute(dummy);
+				return true;
 			case R.id.logout:
 				Log.v("container", "logout");
 

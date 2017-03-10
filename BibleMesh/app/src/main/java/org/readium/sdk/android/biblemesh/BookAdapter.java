@@ -18,8 +18,8 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
 	private final Activity activity;
 	private final List<EPubTitle> frontBooks;
 
-	public BookAdapter(Activity activity, List<EPubTitle> objects, int layout) {
-		super(activity, layout, objects);
+	public BookAdapter(Activity activity, List<EPubTitle> objects) {//}, int layout) {
+		super(activity, R.layout.container_list, objects);
 		this.activity = activity;
         this.frontBooks = objects;
     }
@@ -69,15 +69,15 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
 		    if (frontBooks.get(position).cover == null) {
 			    sqView.cover.setImageBitmap(null);
 			    Log.e("shared", "pos" + position + " is null");
-			    if (frontBooks.get(position).coverHref != null) {
+			    /*if (frontBooks.get(position).coverHref != null) {
 				    if (frontBooks.get(position).coverHref.equals("")) {
-				    } else {
+				    } else {*/
 					    /*new DownloadImageTask(frontBooks.get(position), sqView.cover)
 							    .execute("https://read.biblemesh.com/" + frontBooks.get(position).coverHref);*/
 					    new DownloadImageTask(frontBooks.get(position), sqView.cover)
 							    .execute("https://read.biblemesh.com/epub_content/book_"+frontBooks.get(position).bookID.toString()+"/cover_thumbnail_created_on_import.png");
-					}
-			    }
+				//	}
+			    //}
 		    } else {
 			    sqView.cover.setImageBitmap(frontBooks.get(position).cover);
 		    }

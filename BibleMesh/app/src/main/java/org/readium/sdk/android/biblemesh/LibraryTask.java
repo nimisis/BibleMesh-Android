@@ -1,28 +1,35 @@
 package org.readium.sdk.android.biblemesh;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.util.Log;
 import android.webkit.CookieManager;
+import android.widget.ListView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.readium.sdk.android.Container;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 import java.util.TimeZone;
 
 public class LibraryTask extends AsyncTask<Integer, Integer, Long> {
 
-	private LoginActivity activity;
+	private Activity activity;
+	private Boolean launch;
 
-	public LibraryTask(LoginActivity activity) {
+	public LibraryTask(Activity activity, Boolean launchlibrary) {
 		this.activity = activity;
+		this.launch = launchlibrary;
 	}
 
 	@Override
@@ -32,13 +39,6 @@ public class LibraryTask extends AsyncTask<Integer, Integer, Long> {
 		
 	@Override
 	protected void onPreExecute() {
-		/*dialog.show(activity, "title", "message", false, true, new DialogInterface.OnCancelListener() {
-			
-			@Override
-			public void onCancel(DialogInterface dialog) {
-				Log.v("progress", "cancel");
-			}
-		});*/
 	}
 
 	protected Long doInBackground(Integer... vid) {
@@ -77,21 +77,9 @@ public class LibraryTask extends AsyncTask<Integer, Integer, Long> {
 				}
 				br.close();
 				Log.v("login", "librarytask:"+sb.toString());
-				/*JSONObject jsonObject = new JSONObject(sb.toString());
-				Long serverTime = jsonObject.getLong("currentServerTime");
-				Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis();
-				Log.v("login", "diff2: " + (serverTime - unixtime));
-				activity.serverTimeOffset = serverTime - unixtime;*/
-
 
 				DBHelper dbHelper = new DBHelper(activity);
 				DBCursor cursor = dbHelper.getLocations(LoginActivity.userID);
-
-				/*for(int i = 0; i < cursor.getCount(); i++) {
-					Log.v("locs", "bookID:"+cursor.getColBookID()+" booktitle:"+cursor.getColTitle());
-					cursor.moveToNext();
-				}
-				cursor.moveToFirst();*/
 
 				Log.v("direct", String.format("Got %d locations", cursor.getCount()));
 				if (cursor.getCount() == 0) {
@@ -175,9 +163,33 @@ public class LibraryTask extends AsyncTask<Integer, Integer, Long> {
 
     protected void onPostExecute(Long result) {
     	Log.v("ServerTimeTask", "onPostExecute");
-
-	    Intent intent = new Intent(activity.getApplicationContext(),
-			    ContainerList.class);
-	    activity.startActivity(intent);
+		if (launch) {
+			Intent intent = new Intent(activity.getApplicationContext(),
+					ContainerList.class);
+			((LoginActivity) activity).startActivity(intent);
+		} else {
+			final DBHelper dbHelper = new DBHelper(activity);
+			DBCursor cursor = dbHelper.getLocations(LoginActivity.userID);
+			List<EPubTitle> booksArray = new ArrayList<EPubTitle>();
+			for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
+				cursor.moveToPosition(rowNum);
+				EPubTitle ep = new EPubTitle();
+				ep.downloadStatus = cursor.getColDownloadStatus();
+				ep.bookID = cursor.getColBookID();
+				//reset downloadStatus so it is never stuck in "downloading" phase
+				if (ep.downloadStatus == 1) {
+					ep.downloadStatus = 0;
+					dbHelper.setDownloadStatus(ep.bookID, 0);
+				}
+				ep.fsize = cursor.getColFSize();
+				ep.author = cursor.getColAuthor();
+				ep.title = cursor.getColTitle();
+				ep.coverHref = cursor.getColCoverHref();
+				booksArray.add(ep);
+			}
+			ListView view = (ListView) activity.findViewById(R.id.containerList);
+			((ContainerList) activity).bookListAdapter = new BookAdapter(activity, booksArray);
+			view.setAdapter(((ContainerList) activity).bookListAdapter);
+		}
     }
 }

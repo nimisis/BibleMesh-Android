@@ -80,7 +80,7 @@ public class LoginActivity extends Activity {
 		if (firstload) {
 			firstload = false;
 			String livesession = cookieManager.getCookie("https://read.biblemesh.com");
-			//fix cookie expiry date?
+			//todo cookie expiry date?
 
 			SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
 			Integer savedUserID = pref.getInt("userID", 0);
@@ -91,8 +91,9 @@ public class LoginActivity extends Activity {
 				Integer dummy = 1;
 				new ServerTimeTask(LoginActivity.this).execute(dummy);
 
-				//Integer dummy = 1;
-				new LibraryTask(LoginActivity.this).execute(dummy);
+				Intent intent = new Intent(getApplicationContext(),
+						ContainerList.class);
+				startActivity(intent);
 			} else {
 				//check internet connectivity
 				if (NetworkUtil.getConnectivityStatus(getApplicationContext()) == NetworkUtil.TYPE_NOT_CONNECTED) {
@@ -212,7 +213,7 @@ public class LoginActivity extends Activity {
 			}
 
 			Integer dummy = 1;
-			new LibraryTask(LoginActivity.this).execute(dummy);
+			new LibraryTask(LoginActivity.this, true).execute(dummy);
 		}
 	}
 }

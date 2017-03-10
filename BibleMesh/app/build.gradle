@@ -18,6 +18,7 @@ dependencies {
     //compile 'com.android.tools.build:gradle:2.2.3'
     compile fileTree(include: '*.jar', dir: '../libs')
     compile files('libs/libGoogleAnalyticsServices.jar')
+    //compile 'com.joanzapata.iconify:android-iconify-fontawesome:2.2.2' // (v4.5)
 }
 
 task buildCssAssets(type: Copy) {

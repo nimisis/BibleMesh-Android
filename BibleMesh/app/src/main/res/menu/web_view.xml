@@ -32,11 +32,11 @@
         android:title="@string/menu_mo_next"
         android:visible="false" />
 
-    <item
-        android:id="@+id/settings"
-        android:orderInCategory="100"
-        android:showAsAction="ifRoom"
-        android:title="@string/settingsicon"/>
+	<item
+		android:id="@+id/settings"
+		android:orderInCategory="100"
+		android:showAsAction="ifRoom"
+		android:title="@string/settings"/>
 
 	<item
 		android:id="@+id/add_bookmark"
