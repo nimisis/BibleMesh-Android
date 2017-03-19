@@ -33,6 +33,12 @@
         android:visible="false" />
 
 	<item
+		android:id="@+id/toc"
+		android:orderInCategory="100"
+		android:showAsAction="ifRoom"
+		android:title="@string/table_of_contents"/>
+
+	<item
 		android:id="@+id/settings"
 		android:orderInCategory="100"
 		android:showAsAction="ifRoom"

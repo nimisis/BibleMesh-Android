@@ -23,8 +23,15 @@
 
 package org.readium.sdk.android.biblemesh;
 
-public class Constants {
-	public static final String CONTAINER_ID = "container_id";
-	public static final String OPEN_PAGE_REQUEST_DATA = "openPageRequestData";
-	public static final String BOOK_NAME = "bookname";
+import org.readium.sdk.android.components.navigation.NavigationTable;
+
+public class TableOfContentsActivity extends NavigationTableActivity {
+
+	protected NavigationTable getNavigationTable() {
+		NavigationTable navigationTable = null;
+        if (pckg != null) {
+        	navigationTable = pckg.getTableOfContents();
+        }
+		return (navigationTable != null) ? navigationTable : new NavigationTable("toc", "", "");
+	}
 }

@@ -35,9 +35,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.util.Calendar;
 import java.util.List;
@@ -101,6 +103,8 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import android.widget.VideoView;
+
+import static org.readium.sdk.android.biblemesh.R.menu.container;
 
 public class WebViewActivity extends FragmentActivity implements
 		ViewerSettingsDialog.OnViewerSettingsChange {
@@ -430,23 +434,28 @@ public class WebViewActivity extends FragmentActivity implements
 					Log.d(TAG, "Add highlight");
 				mReadiumJSApi.highlightSelection();
 				return true;*/
-		case R.id.settings:
-			if (!quiet)
-				Log.d(TAG, "Show settings");
-			showSettings();
-			return true;
-		case R.id.mo_previous:
-			mReadiumJSApi.previousMediaOverlay();
-			return true;
-		case R.id.mo_play:
-			mReadiumJSApi.toggleMediaOverlay();
-			return true;
-		case R.id.mo_pause:
-			mReadiumJSApi.toggleMediaOverlay();
-			return true;
-		case R.id.mo_next:
-			mReadiumJSApi.nextMediaOverlay();
-			return true;
+			case R.id.settings:
+				if (!quiet)
+					Log.d(TAG, "Show settings");
+				showSettings();
+				return true;
+			case R.id.toc:
+				if (!quiet)
+					Log.d(TAG, "Show toc");
+				showToC();
+				return true;
+			case R.id.mo_previous:
+				mReadiumJSApi.previousMediaOverlay();
+				return true;
+			case R.id.mo_play:
+				mReadiumJSApi.toggleMediaOverlay();
+				return true;
+			case R.id.mo_pause:
+				mReadiumJSApi.toggleMediaOverlay();
+				return true;
+			case R.id.mo_next:
+				mReadiumJSApi.nextMediaOverlay();
+				return true;
 		}
 		return false;
 	}
@@ -469,6 +478,17 @@ public class WebViewActivity extends FragmentActivity implements
 		dialog.setArguments(args);*/
 		dialog.show(fm, "dialog");
 		fragmentTransaction.commit();
+	}
+
+	private void showToC() {
+		Log.v("web", "show ToC");
+
+		Intent intent = new Intent(WebViewActivity.this, TableOfContentsActivity.class);
+		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		intent.putExtra(Constants.BOOK_NAME, ContainerList.container.getName());
+		intent.putExtra(Constants.CONTAINER_ID, ContainerList.container.getNativePtr());
+
+		startActivity(intent);
 	}
 
 	@Override
@@ -506,8 +526,16 @@ public class WebViewActivity extends FragmentActivity implements
 		faIcon.setTextColor(Color.parseColor("#ffffff"));
 		faIcon.setTypeface(face);
 		faIcon.setText(getResources().getText(R.string.fa_cog));
+		TextDrawable faIcon2 = new TextDrawable(this);
+		faIcon2.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+		faIcon2.setTextAlign(Layout.Alignment.ALIGN_CENTER);
+		faIcon2.setTextColor(Color.parseColor("#ffffff"));
+		faIcon2.setTypeface(face);
+		faIcon2.setText(getResources().getText(R.string.fa_toc));
 		MenuItem menuItem = menu.findItem(R.id.settings);
 		menuItem.setIcon(faIcon);
+		MenuItem menuItem2 = menu.findItem(R.id.toc);
+		menuItem2.setIcon(faIcon2);
 
 		return true;
 	}
@@ -1198,7 +1226,18 @@ public class WebViewActivity extends FragmentActivity implements
 						@Override
 						public void onClick(DialogInterface dialog, int which) {
 							//// FIXME: 07/02/2017 todo
-							dialog.dismiss();
+
+							try {
+								String shareurl = URLEncoder.encode("{\"idref\":\""+cursor.getColIDRef()+"\",\"elementCfi\":\""+cursor.getColCFI()+"\"}", "UTF-8");
+								Intent sharingIntent = new Intent(android.content.Intent.ACTION_SEND);
+								sharingIntent.setType("text/plain");
+								sharingIntent.putExtra(Intent.EXTRA_TEXT, "https://read.biblemesh.com/book/7?goto="+shareurl);
+								startActivity(Intent.createChooser(sharingIntent, "Share via"));
+
+								dialog.dismiss();
+							} catch (UnsupportedEncodingException e) {
+								e.printStackTrace();
+							}
 						}
 					})
 					.setPositiveButton("Save",

@@ -38,8 +38,10 @@
     <string name="settings">Settings</string>
     <string name="settingsicon">\u2699</string>
     <string name="fa_cog">&#xf013;</string>
+    <string name="fa_toc">&#xf0ca;</string>
     <string name="fa_refresh">&#xf021;</string>
     <string name="fa_logout">&#xf08b;</string>
+    <string name="fa_bars">&#xf0c9;</string>
     <string name="title">Title</string>
     <string name="left">&lt;&lt;</string>
     <string name="right">&gt;&gt;</string>

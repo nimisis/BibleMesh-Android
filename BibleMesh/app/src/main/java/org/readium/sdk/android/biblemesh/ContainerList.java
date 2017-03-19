@@ -70,6 +70,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 	public BookAdapter bookListAdapter;
 	//List<EPubTitle> booksArray;
 	final private String PATH = Environment.getExternalStorageDirectory() + "/Android/data/org.readium.sdk.android.biblemesh/";
+	static Container container;
 
 	protected abstract class SdkErrorHandlerMessagesCompleted {
 		Intent m_intent = null;
@@ -430,7 +431,8 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 		m_SdkErrorHandler_Messages = new Stack<String>();
 
 		EPub3.setSdkErrorHandler(ContainerList.this);
-		Container container = EPub3.openBook(fstr);
+		//Container
+				container = EPub3.openBook(fstr);
 		EPub3.setSdkErrorHandler(null);
 
 		ContainerHolder.getInstance().put(container.getNativePtr(), container);
