@@ -187,6 +187,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 								f.delete();
 								downloadIt = true;
 							} else {
+								view.setEnabled(false);
 								LoginActivity.bookID = ep.bookID;
 								new GetBookDataTask(ContainerList.this, dbHelper, fstr).execute(ep);
 							}
@@ -463,6 +464,10 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 
 		// async!
 		popSdkErrorHandlerMessage(context, callback);
+
+		//re-enable listview after preventing double-click
+		final ListView view = (ListView) findViewById(R.id.containerList);
+		view.setEnabled(true);
 	}
 
 }

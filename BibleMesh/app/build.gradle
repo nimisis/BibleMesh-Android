@@ -74,4 +74,5 @@ android {
             debuggable true
         }
     }
+    buildToolsVersion '25.0.0'
 }

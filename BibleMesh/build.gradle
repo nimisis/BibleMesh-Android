@@ -15,7 +15,8 @@ buildscript {
         if (ndkDebug) {
             classpath "com.android.tools.build:gradle-experimental:0.8.2"
         } else {
-            classpath "com.android.tools.build:gradle:2.2.2"
+            //classpath "com.android.tools.build:gradle:2.2.2"
+            classpath "com.android.tools.build:gradle:2.3.0"
         }
 
     }
