@@ -489,6 +489,7 @@ public class WebViewActivity extends FragmentActivity implements
 		intent.putExtra(Constants.CONTAINER_ID, ContainerList.container.getNativePtr());
 
 		startActivity(intent);
+		finish();
 	}
 
 	@Override

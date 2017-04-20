@@ -107,6 +107,7 @@ public abstract class NavigationTableActivity extends Activity {
             		try {
 						intent.putExtra(Constants.OPEN_PAGE_REQUEST_DATA, openPageRequest.toJSON().toString());
 	            		startActivity(intent);
+			            finish();
 					} catch (JSONException e) {
 						Log.e(TAG, ""+e.getMessage(), e);
 					}
