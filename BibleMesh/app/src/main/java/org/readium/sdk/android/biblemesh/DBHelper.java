@@ -51,10 +51,14 @@ public class DBHelper extends SQLiteOpenHelper {
 		super(context, DATABASE_NAME, null, DATABASE_VERSION);
 	}
 
-	public DBCursor getLocations(Integer userID) {//todo use LoginActivity.userID instead?
+	public DBCursor getLocations() {
+		if (LoginActivity.userID == null) {
+			int hi;
+			hi = 1;
+		}
 		String sql = "SELECT locations.*, books.title, books.author, books.coverHref, books.rootURL, books.downloadStatus, " +
 				"books.fsize FROM locations left join books on locations.bookID = books.bookID " +
-				"where locations.userID = " + userID.toString() + " order by locations.bookID asc";
+				"where locations.userID = " + LoginActivity.userID.toString() + " order by locations.bookID asc";
 		SQLiteDatabase d = getReadableDatabase();
 		DBCursor c = (DBCursor) d.rawQueryWithFactory(
 				new DBCursor.Factory(),

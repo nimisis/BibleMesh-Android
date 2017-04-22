@@ -86,6 +86,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.ActionMode;
 import android.view.GestureDetector;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
@@ -257,6 +258,15 @@ public class WebViewActivity extends FragmentActivity implements
 		getWindow().requestFeature(Window.FEATURE_ACTION_BAR_OVERLAY);
 
 		setContentView(R.layout.activity_web_view);
+
+		final int abTitleId = getResources().getIdentifier("action_bar_title", "id", "android");
+		findViewById(abTitleId).setOnClickListener(new View.OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				finish();
+			}
+		});
 
 		mWebview = (WebView) findViewById(R.id.webview);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT
@@ -1310,4 +1320,15 @@ public class WebViewActivity extends FragmentActivity implements
 		mActionMode = null;
 		super.onActionModeFinished(mode);
 	}
+
+	/*
+	//http://stackoverflow.com/questions/14390908/how-to-control-the-android-webview-history-back-stack
+	@Override
+	public void onBackPressed() {
+		if (mWebview.canGoBack()) {
+			mWebview.goBack();
+		} else {
+			super.onBackPressed();
+		}
+	}*/
 }

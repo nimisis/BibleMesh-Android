@@ -18286,7 +18286,7 @@ var ReaderView = function (options) {
 
         if (!ReadiumSDK) return;
 
-        var DEBUG = true; // change this to visualize the CFI range
+        var DEBUG = false; // change this to visualize the CFI range
         if (!DEBUG) return;
             
         var paginationInfo = this.getPaginationInfo();

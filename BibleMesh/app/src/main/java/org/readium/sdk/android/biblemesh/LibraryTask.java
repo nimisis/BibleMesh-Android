@@ -79,7 +79,7 @@ public class LibraryTask extends AsyncTask<Integer, Integer, Long> {
 				Log.v("login", "librarytask:"+sb.toString());
 
 				DBHelper dbHelper = new DBHelper(activity);
-				DBCursor cursor = dbHelper.getLocations(LoginActivity.userID);
+				DBCursor cursor = dbHelper.getLocations();
 
 				Log.v("direct", String.format("Got %d locations", cursor.getCount()));
 				if (cursor.getCount() == 0) {
@@ -169,7 +169,7 @@ public class LibraryTask extends AsyncTask<Integer, Integer, Long> {
 			((LoginActivity) activity).startActivity(intent);
 		} else {
 			final DBHelper dbHelper = new DBHelper(activity);
-			DBCursor cursor = dbHelper.getLocations(LoginActivity.userID);
+			DBCursor cursor = dbHelper.getLocations();
 			List<EPubTitle> booksArray = new ArrayList<EPubTitle>();
 			for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
 				cursor.moveToPosition(rowNum);

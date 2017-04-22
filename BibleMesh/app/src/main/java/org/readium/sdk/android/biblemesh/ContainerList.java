@@ -139,7 +139,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 		final ListView view = (ListView) findViewById(R.id.containerList);
 
 		final DBHelper dbHelper = new DBHelper(getApplicationContext());
-		DBCursor cursor = dbHelper.getLocations(LoginActivity.userID);
+		DBCursor cursor = dbHelper.getLocations();
 
 		final List<EPubTitle> booksArray = new ArrayList<EPubTitle>();
 		for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
