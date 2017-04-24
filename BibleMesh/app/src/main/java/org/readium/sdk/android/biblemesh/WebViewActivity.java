@@ -548,6 +548,16 @@ public class WebViewActivity extends FragmentActivity implements
 		MenuItem menuItem2 = menu.findItem(R.id.toc);
 		menuItem2.setIcon(faIcon2);
 
+		/*MenuItem menuItem3 = menu.findItem(R.id.toc);
+		item.setOnMenuItemClickListener
+				(
+						new MenuItem.OnMenuItemClickListener ()
+						{
+							public boolean onMenuItemClick(MenuItem item)
+							{ return (showDirectory(item)); }
+						}
+				);*/
+
 		return true;
 	}
 
@@ -1290,29 +1300,22 @@ public class WebViewActivity extends FragmentActivity implements
 
 			// Inflate your own menu items
 			mode.getMenuInflater().inflate(R.menu.context_menu, menu);
+
+			MenuItem item = menu.findItem(R.id.highlight_item);
+			item.setOnMenuItemClickListener
+					(
+							new MenuItem.OnMenuItemClickListener ()
+							{
+								public boolean onMenuItemClick(MenuItem item)
+								{
+									mReadiumJSApi.highlightSelection();
+									return true;
+								}
+							}
+					);
 		}
 
 		super.onActionModeStarted(mode);
-	}
-
-	// This method is what you should set as your item's onClick
-	// <item android:onClick="onContextualMenuItemClicked" />
-	public void onContextualMenuItemClicked(MenuItem item) {
-		switch (item.getItemId()) {
-			case R.id.highlight_item:
-			{
-				mReadiumJSApi.highlightSelection();
-			}
-			break;
-			default:
-				// ...
-				break;
-		}
-
-		// This will likely always be true, but check it anyway, just in case
-		if (mActionMode != null) {
-			mActionMode.finish();
-		}
 	}
 
 	@Override
