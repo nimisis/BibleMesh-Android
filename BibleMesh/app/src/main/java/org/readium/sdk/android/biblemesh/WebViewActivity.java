@@ -1252,7 +1252,7 @@ public class WebViewActivity extends FragmentActivity implements
 								String shareurl = URLEncoder.encode("{\"idref\":\""+cursor.getColIDRef()+"\",\"elementCfi\":\""+cursor.getColCFI()+"\"}", "UTF-8");
 								Intent sharingIntent = new Intent(android.content.Intent.ACTION_SEND);
 								sharingIntent.setType("text/plain");
-								sharingIntent.putExtra(Intent.EXTRA_TEXT, "https://read.biblemesh.com/book/7?goto="+shareurl);
+								sharingIntent.putExtra(Intent.EXTRA_TEXT, "https://read.biblemesh.com/book/"+LoginActivity.bookID+"?goto="+shareurl+"&highlight=%20");//todo
 								startActivity(Intent.createChooser(sharingIntent, "Share via"));
 
 								dialog.dismiss();
@@ -1324,7 +1324,7 @@ public class WebViewActivity extends FragmentActivity implements
 		super.onActionModeFinished(mode);
 	}
 
-	/*
+/*
 	//http://stackoverflow.com/questions/14390908/how-to-control-the-android-webview-history-back-stack
 	@Override
 	public void onBackPressed() {
