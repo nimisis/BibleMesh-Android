@@ -214,9 +214,12 @@ require(['readium_shared_js/views/reader_view'], function (ReaderView)
                     reader.plugins.highlights.on("annotationClicked", function(type, idref, cfi, id) {
                                                     console.log("ANNOTATION CLICKed: " + id);
                                                     //reader.plugins.highlights.removeHighlight(id);
-                    if(window.LauncherUI && window.LauncherUI.onAnnotationClicked) {
-                        window.LauncherUI.onAnnotationClicked(id);
+                    if(window.LauncherUI && window.LauncherUI.getHighlight) {
+                        window.LauncherUI.getHighlight(JSON.stringify(reader.plugins.highlights.getHighlight(id)));
                     }
+                    /*if(window.LauncherUI && window.LauncherUI.onAnnotationClicked) {
+                        window.LauncherUI.onAnnotationClicked(id);
+                    }*/
                                                     });
                     /*reader.plugins.highlights.on("textSelectionEvent", function() {
                                                     console.log("ANNOTATION SELECT");

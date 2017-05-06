@@ -66,6 +66,11 @@ public class ReadiumJSApi {
 		loadJS("ReadiumSDK.reader.plugins.highlights.addHighlight('"+idref+"', '"+cfi+"', "+annotationID+", 'highlight')");
 	}
 
+	public void getHighlight(String annotationID) {
+		loadJS("window.LauncherUI.getHighlight(JSON.stringify(ReadiumSDK.reader.plugins.highlights.getHighlight('"+annotationID+"')));");
+		//loadJS("ReadiumSDK.reader.plugins.highlights.getHighlight('"+annotationID+"')");
+	}
+
 	public void highlightSelection() {
 		//ReadiumSDK.reader.bookmarkCurrentPage()
 		//loadJS("window.LauncherUI.highlightSelection(ReadiumSDK.reader.plugins.highlights.removeHighlightsByType('highlight'), 'hello');");

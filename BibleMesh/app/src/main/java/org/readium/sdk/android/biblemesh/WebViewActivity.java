@@ -437,13 +437,7 @@ public class WebViewActivity extends FragmentActivity implements
 				if (!quiet)
 					Log.d(TAG, "Add a bookmark");
 				mReadiumJSApi.bookmarkCurrentPage();
-				//mReadiumJSApi.highlightSelection();
 				return true;
-			/*case R.id.add_highlight:
-				if (!quiet)
-					Log.d(TAG, "Add highlight");
-				mReadiumJSApi.highlightSelection();
-				return true;*/
 			case R.id.settings:
 				if (!quiet)
 					Log.d(TAG, "Show settings");
@@ -1210,9 +1204,15 @@ public class WebViewActivity extends FragmentActivity implements
 		}
 
 		@JavascriptInterface
-		public void onAnnotationClicked(final String id) {
+		public void getHighlight(final String response) {
 			if (!quiet)
-				Log.d(TAG, "onAnnotationClicked:" + id);
+				Log.d(TAG, "getHighlight:" + response);
+
+			try {
+				final JSONObject selJson = new JSONObject(response);
+				final String id = selJson.getString("id");
+				final String selectedText = selJson.getString("selectedText");
+
 			// this should be real json parsing if there will be more data that
 			// needs to be extracted
 
@@ -1246,13 +1246,11 @@ public class WebViewActivity extends FragmentActivity implements
 					.setNeutralButton("Share", new DialogInterface.OnClickListener() {
 						@Override
 						public void onClick(DialogInterface dialog, int which) {
-							//// FIXME: 07/02/2017 todo
-
 							try {
 								String shareurl = URLEncoder.encode("{\"idref\":\""+cursor.getColIDRef()+"\",\"elementCfi\":\""+cursor.getColCFI()+"\"}", "UTF-8");
-								Intent sharingIntent = new Intent(android.content.Intent.ACTION_SEND);
+								Intent sharingIntent = new Intent(Intent.ACTION_SEND);
 								sharingIntent.setType("text/plain");
-								sharingIntent.putExtra(Intent.EXTRA_TEXT, "https://read.biblemesh.com/book/"+LoginActivity.bookID+"?goto="+shareurl+"&highlight=%20");//todo
+								sharingIntent.putExtra(Intent.EXTRA_TEXT, "https://read.biblemesh.com/book/"+LoginActivity.bookID+"?goto="+shareurl+"&highlight="+URLEncoder.encode(selectedText));
 								startActivity(Intent.createChooser(sharingIntent, "Share via"));
 
 								dialog.dismiss();
@@ -1281,6 +1279,9 @@ public class WebViewActivity extends FragmentActivity implements
 			//builder.setNegativeButton(android.R.string.cancel, null);
 			builder.show();
 
+			} catch (JSONException e) {
+				e.printStackTrace();
+			}
 		}
 	}
 
