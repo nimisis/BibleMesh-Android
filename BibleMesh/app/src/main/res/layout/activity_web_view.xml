@@ -13,7 +13,7 @@
 		android:layout_weight="1"
 		android:layout_marginTop="?android:attr/actionBarSize"
 		android:id="@+id/webview"/>
-    
+
     <LinearLayout android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

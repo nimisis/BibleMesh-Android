@@ -93,6 +93,9 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.animation.Animation;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.Transformation;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -239,19 +242,75 @@ public class WebViewActivity extends FragmentActivity implements
 			return false;
 		}*/
 
-		@Override
+		/*@Override
+		public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY)
+		{
+			mIsScrolling = true;
+			// Make sure that mTextView is the text view you want to move around
+
+			if (!(mWebview.getLayoutParams() instanceof ViewGroup.MarginLayoutParams))
+			{
+				return false;
+			}
+
+			Log.v("scroll", "scroll"+distanceX+" "+e2.toString()+" "+e1.toString());
+
+			ViewGroup.MarginLayoutParams marginLayoutParams = (ViewGroup.MarginLayoutParams) mWebview.getLayoutParams();
+
+			marginLayoutParams.leftMargin = marginLayoutParams.leftMargin - (int) distanceX;
+			marginLayoutParams.rightMargin = -marginLayoutParams.leftMargin;// marginLayoutParams.rightMargin + (int) distanceX;
+
+			mWebview.requestLayout();
+
+			return true;
+		}*/
+
+		/*@Override
 		public boolean onFling(MotionEvent event1, MotionEvent event2,
 		                       float velocityX, float velocityY) {
 			//Log.d(DEBUG_TAG, "onFling: " + event1.toString()+event2.toString());
 			if (velocityX > 0) {
+				Log.i("fling", "left");
 				mReadiumJSApi.openPageLeft();
 			} else {
+				Log.i("fling", "right");
 				mReadiumJSApi.openPageRight();
 			}
 			return true;
-		}
+		}*/
 	}
 
+	private void snapBack ()
+	{
+		if (mWebview.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)
+		{
+			final ViewGroup.MarginLayoutParams marginLayoutParams = (ViewGroup.MarginLayoutParams) mWebview.getLayoutParams();
+
+			final int startValueX = marginLayoutParams.leftMargin;
+			final int endValueX = 0;
+			//final float startValueAlpha = mWebview.getAlpha();
+
+			mWebview.clearAnimation();
+
+			Animation animation = new Animation()
+			{
+				@Override
+				protected void applyTransformation(float interpolatedTime, Transformation t)
+				{
+					int leftMarginInterpolatedValue = (int) (startValueX + (endValueX - startValueX) * interpolatedTime);
+					//float alphaInterpolatedValue = startValueAlpha -startValueAlpha * interpolatedTime;
+					marginLayoutParams.leftMargin = leftMarginInterpolatedValue;
+					marginLayoutParams.rightMargin = -leftMarginInterpolatedValue;
+					//mWebview.setAlpha(alphaInterpolatedValue);
+
+					mWebview.requestLayout();
+				}
+			};
+			animation.setDuration(200);
+			animation.setInterpolator(new DecelerateInterpolator());
+			mWebview.startAnimation(animation);
+		}
+	}
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -281,11 +340,96 @@ public class WebViewActivity extends FragmentActivity implements
 
 		mWebview.setOnTouchListener(new View.OnTouchListener() {
 
+			float lastEventX;
+			float distanceX;
+
 			@Override
 			public boolean onTouch(View v, MotionEvent event) {
+
+				switch (event.getAction()) {
+					case MotionEvent.ACTION_DOWN:
+						lastEventX = event.getX();
+						break;
+					case MotionEvent.ACTION_MOVE:
+						{
+							distanceX = lastEventX - event.getX();
+
+							ViewGroup.MarginLayoutParams marginLayoutParams = (ViewGroup.MarginLayoutParams) mWebview.getLayoutParams();
+
+							marginLayoutParams.leftMargin = marginLayoutParams.leftMargin - (int) distanceX;
+							marginLayoutParams.rightMargin = -marginLayoutParams.leftMargin;// marginLayoutParams.rightMargin + (int) distanceX;
+
+							mWebview.requestLayout();
+						}
+						break;
+					case MotionEvent.ACTION_UP:
+					case MotionEvent.ACTION_CANCEL:
+						{
+							ViewGroup.MarginLayoutParams marginLayoutParams = (ViewGroup.MarginLayoutParams) mWebview.getLayoutParams();
+
+							//Log.i("snap", "snap width: "+mWebview.getWidth()+" left:" + marginLayoutParams.leftMargin + " raw:" + event.getRawX() + " " + event.getX());//+" "+e2.toString()+" "+e1.toString());
+							//mWebview.getWidth()
+							if (marginLayoutParams.leftMargin < -0.5*mWebview.getWidth()) {
+								mReadiumJSApi.openPageRight();
+								mWebview.setAlpha(0.0f);
+							} else if (marginLayoutParams.leftMargin > 0.5*mWebview.getWidth()) {
+								mReadiumJSApi.openPageLeft();
+								mWebview.setAlpha(0.0f);
+							} else {
+								snapBack();
+							}
+							distanceX = 0;
+						}
+						break;
+				};
+
+				/*if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL)
+				{
+					//return false;
+				}*/
 				return gestureDetector.onTouchEvent(event);
 			}
 		});
+		mWebview.setHapticFeedbackEnabled(false);
+		/*mWebview.setOnLongClickListener(new View.OnLongClickListener() {
+			@Override
+			public boolean onLongClick(View v) {
+				return true;
+			}
+		});
+		mWebview.setLongClickable(false);*/
+
+		/*mWebview.setOnTouchListener(new View.OnTouchListener() {
+			@Override
+			public boolean onTouch(View view, MotionEvent event)
+			{
+				//if (currentState != State.EDIT_MOVE) return false;
+
+				FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) view.getLayoutParams();
+				//if (view.getId() != R.id.layout_counter) return false;
+
+				switch (event.getAction())
+				{
+					case MotionEvent.ACTION_MOVE:
+						params.topMargin = (int) event.getRawY() - view.getHeight();
+						params.leftMargin = (int) event.getRawX() - (view.getWidth() / 2);
+						view.setLayoutParams(params);
+						break;
+
+					case MotionEvent.ACTION_UP:
+						params.topMargin = (int) event.getRawY() - view.getHeight();
+						params.leftMargin = (int) event.getRawX() - (view.getWidth() / 2);
+						view.setLayoutParams(params);
+						break;
+
+					case MotionEvent.ACTION_DOWN:
+						view.setLayoutParams(params);
+						break;
+				}
+
+				return true;
+			}
+		});*/
 
 		Intent intent = getIntent();
 		if (intent.getFlags() == Intent.FLAG_ACTIVITY_NEW_TASK) {
@@ -865,6 +1009,14 @@ public class WebViewActivity extends FragmentActivity implements
 									isFixedLayout);
 							mWebview.getSettings()
 									.setDisplayZoomControls(false);
+
+							//Log.i("openpage", "reset margins");
+							ViewGroup.MarginLayoutParams marginLayoutParams = (ViewGroup.MarginLayoutParams) mWebview.getLayoutParams();
+
+							marginLayoutParams.leftMargin = marginLayoutParams.rightMargin = 0;//-marginLayoutParams.leftMargin;// marginLayoutParams.rightMargin + (int) distanceX;
+
+							mWebview.setAlpha(1.0f);
+							mWebview.requestLayout();
 
 							Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
 							Integer annotationID = -1;
