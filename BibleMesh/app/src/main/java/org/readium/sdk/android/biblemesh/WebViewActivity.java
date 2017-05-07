@@ -1251,20 +1251,28 @@ public class WebViewActivity extends FragmentActivity implements
 				final String selidref = selJson.getString("idref");
 				final String selcfi = selJson.getString("cfi");
 
-				final Integer random = (int) (Math.random() * 1000000 + 1);
-
 				DBHelper dbHelper = DBHelper.getInstance(WebViewActivity.this);//new DBHelper(WebViewActivity.this);
-				final Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
-				dbHelper.insertHighlight(LoginActivity.bookID, selidref, selcfi, 1, "", unixtime, random);
 
-				runOnUiThread(new Runnable() {
-					@Override
-					public void run() {
-						mReadiumJSApi.addHighlight(selidref, selcfi, random);
-						mReadiumJSApi.updateLocation(unixtime, random, false);
-					}
-				});
+				//check through current list for a repeat
+				Boolean repeat = dbHelper.isRepeatHighlight(LoginActivity.bookID, selidref, selcfi);
 
+				if (!repeat) {
+					final Integer random = (int) (Math.random() * 1000000 + 1);
+
+					final Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
+					dbHelper.insertHighlight(LoginActivity.bookID, selidref, selcfi, 1, "", unixtime, random);
+
+					runOnUiThread(new Runnable() {
+						@Override
+						public void run() {
+							mReadiumJSApi.addHighlight(selidref, selcfi, random);
+							mReadiumJSApi.updateLocation(unixtime, random, false);
+						}
+					});
+				} else {
+					int hi;
+					hi = 1;
+				}
 			} catch (JSONException e) {
 				Log.v("webview", e.getMessage());
 			}
@@ -1462,17 +1470,14 @@ public class WebViewActivity extends FragmentActivity implements
 		super.onActionModeFinished(mode);
 	}
 
+	/*
 	//http://stackoverflow.com/questions/14390908/how-to-control-the-android-webview-history-back-stack
 	@Override
 	public void onBackPressed() {
-		/*if (mWebview.canGoBack()) {
+		if (mWebview.canGoBack()) {
 			mWebview.goBack();
-		} else {*/
-		if (highlightDlgOpen) {
-			highlightDlgOpen = false;
-		}
+		} else {
 			super.onBackPressed();
-		//}
-
-	}
+		}
+	}*/
 }

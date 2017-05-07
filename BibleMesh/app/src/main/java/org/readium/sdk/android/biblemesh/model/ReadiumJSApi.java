@@ -62,21 +62,14 @@ public class ReadiumJSApi {
 	}
 
 	public void addHighlight(String idref, String cfi, Integer annotationID) {
-		//loadJS("window.LauncherUI.addHighlight(ReadiumSDK.reader.plugins.highlights.addHighlight('"+idref+"', '"+cfi+"', "+annotationID+", 'highlight'));");
 		loadJS("ReadiumSDK.reader.plugins.highlights.addHighlight('"+idref+"', '"+cfi+"', "+annotationID+", 'highlight')");
 	}
 
 	public void getHighlight(String annotationID) {
 		loadJS("window.LauncherUI.getHighlight(JSON.stringify(ReadiumSDK.reader.plugins.highlights.getHighlight('"+annotationID+"')));");
-		//loadJS("ReadiumSDK.reader.plugins.highlights.getHighlight('"+annotationID+"')");
 	}
 
 	public void highlightSelection() {
-		//ReadiumSDK.reader.bookmarkCurrentPage()
-		//loadJS("window.LauncherUI.highlightSelection(ReadiumSDK.reader.plugins.highlights.removeHighlightsByType('highlight'), 'hello');");
-		//loadJS("ReadiumSDK.reader.plugins.highlights.getCurrentSelectionCfi();");
-		//Integer random = 123;
-		//loadJS("ReadiumSDK.reader.plugins.highlights.addSelectionHighlight(1234, 'highlight');");
 		loadJS("window.LauncherUI.highlightSelection(JSON.stringify(ReadiumSDK.reader.plugins.highlights.getCurrentSelectionCfi()));");
 	}
 

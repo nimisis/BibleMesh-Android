@@ -63,6 +63,20 @@ public class DBHelper extends SQLiteOpenHelper {
 		return mInstance;
 	}
 
+	public Boolean isRepeatHighlight(Integer bookID, String idref, String Cfi) {
+		String sql = "SELECT highlights.* FROM highlights where highlights.userID = " + LoginActivity.userID.toString() + " and " +
+				"highlights.bookID = "+bookID.toString()+" and " +
+				"highlights.idref = '"+idref+"' and highlights.cfi = '"+Cfi+"'";
+		SQLiteDatabase d = getReadableDatabase();
+		DBCursor c = (DBCursor) d.rawQueryWithFactory(
+				new DBCursor.Factory(),
+				sql,
+				null,
+				null);
+		//c.moveToFirst();
+		return (c.getCount() > 0);
+	}
+
 	public DBCursor getLocations() {
 		if (LoginActivity.userID == null) {
 			int hi;
