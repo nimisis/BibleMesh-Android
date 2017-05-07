@@ -138,7 +138,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 
 		final ListView view = (ListView) findViewById(R.id.containerList);
 
-		final DBHelper dbHelper = new DBHelper(getApplicationContext());
+		final DBHelper dbHelper = DBHelper.getInstance(getApplicationContext());//new DBHelper(getApplicationContext());
 		DBCursor cursor = dbHelper.getLocations();
 
 		final List<EPubTitle> booksArray = new ArrayList<EPubTitle>();

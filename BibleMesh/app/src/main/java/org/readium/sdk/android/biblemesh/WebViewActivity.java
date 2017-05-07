@@ -340,8 +340,9 @@ public class WebViewActivity extends FragmentActivity implements
 
 		mWebview.setOnTouchListener(new View.OnTouchListener() {
 
+			private final static long MAX_TOUCH_DURATION = 150;
 			float lastEventX;
-			float distanceX;
+			float m_DownTime;
 
 			@Override
 			public boolean onTouch(View v, MotionEvent event) {
@@ -349,10 +350,11 @@ public class WebViewActivity extends FragmentActivity implements
 				switch (event.getAction()) {
 					case MotionEvent.ACTION_DOWN:
 						lastEventX = event.getX();
+						m_DownTime = event.getEventTime(); //init time
 						break;
 					case MotionEvent.ACTION_MOVE:
 						{
-							distanceX = lastEventX - event.getX();
+							float distanceX = lastEventX - event.getX();
 
 							ViewGroup.MarginLayoutParams marginLayoutParams = (ViewGroup.MarginLayoutParams) mWebview.getLayoutParams();
 
@@ -363,6 +365,18 @@ public class WebViewActivity extends FragmentActivity implements
 						}
 						break;
 					case MotionEvent.ACTION_UP:
+					{
+						ViewGroup.MarginLayoutParams marginLayoutParams = (ViewGroup.MarginLayoutParams) mWebview.getLayoutParams();
+						if (marginLayoutParams.leftMargin < 10 && marginLayoutParams.leftMargin > -10) {
+							Log.i("up", "small margin, open menu?");
+							if(event.getEventTime() - m_DownTime <= MAX_TOUCH_DURATION) {
+								Log.i("up", "quick");
+								showActionBar(null);
+							} else {
+								Log.i("up", "too long");
+							}
+						}
+					}
 					case MotionEvent.ACTION_CANCEL:
 						{
 							ViewGroup.MarginLayoutParams marginLayoutParams = (ViewGroup.MarginLayoutParams) mWebview.getLayoutParams();
@@ -377,59 +391,15 @@ public class WebViewActivity extends FragmentActivity implements
 								mWebview.setAlpha(0.0f);
 							} else {
 								snapBack();
+								//return true;
 							}
-							distanceX = 0;
 						}
 						break;
 				};
-
-				/*if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL)
-				{
-					//return false;
-				}*/
 				return gestureDetector.onTouchEvent(event);
 			}
 		});
-		mWebview.setHapticFeedbackEnabled(false);
-		/*mWebview.setOnLongClickListener(new View.OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View v) {
-				return true;
-			}
-		});
-		mWebview.setLongClickable(false);*/
-
-		/*mWebview.setOnTouchListener(new View.OnTouchListener() {
-			@Override
-			public boolean onTouch(View view, MotionEvent event)
-			{
-				//if (currentState != State.EDIT_MOVE) return false;
-
-				FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) view.getLayoutParams();
-				//if (view.getId() != R.id.layout_counter) return false;
-
-				switch (event.getAction())
-				{
-					case MotionEvent.ACTION_MOVE:
-						params.topMargin = (int) event.getRawY() - view.getHeight();
-						params.leftMargin = (int) event.getRawX() - (view.getWidth() / 2);
-						view.setLayoutParams(params);
-						break;
-
-					case MotionEvent.ACTION_UP:
-						params.topMargin = (int) event.getRawY() - view.getHeight();
-						params.leftMargin = (int) event.getRawX() - (view.getWidth() / 2);
-						view.setLayoutParams(params);
-						break;
-
-					case MotionEvent.ACTION_DOWN:
-						view.setLayoutParams(params);
-						break;
-				}
-
-				return true;
-			}
-		});*/
+		/*mWebview.setHapticFeedbackEnabled(false);*/
 
 		Intent intent = getIntent();
 		if (intent.getFlags() == Intent.FLAG_ACTIVITY_NEW_TASK) {
@@ -1128,7 +1098,7 @@ public class WebViewActivity extends FragmentActivity implements
 				}
 
 				//update local values
-				DBHelper dbHelper = new DBHelper(WebViewActivity.this);
+				DBHelper dbHelper = DBHelper.getInstance(WebViewActivity.this);//new DBHelper(WebViewActivity.this);
 				if (annotationID == -1) {
 					dbHelper.setLocation(LoginActivity.bookID,
 							bookmarkJson.getString("idref"),
@@ -1253,7 +1223,7 @@ public class WebViewActivity extends FragmentActivity implements
 			runOnUiThread(new Runnable() {
 				@Override
 				public void run() {
-					DBHelper dbHelper = new DBHelper(WebViewActivity.this);
+					DBHelper dbHelper = DBHelper.getInstance(WebViewActivity.this);//new DBHelper(WebViewActivity.this);
 					DBCursor cursor = dbHelper.getHighlights(LoginActivity.bookID);
 					for (int rowNum = 0; rowNum < cursor.getCount(); rowNum++) {
 						cursor.moveToPosition(rowNum);
@@ -1283,7 +1253,7 @@ public class WebViewActivity extends FragmentActivity implements
 
 				final Integer random = (int) (Math.random() * 1000000 + 1);
 
-				DBHelper dbHelper = new DBHelper(WebViewActivity.this);
+				DBHelper dbHelper = DBHelper.getInstance(WebViewActivity.this);//new DBHelper(WebViewActivity.this);
 				final Long unixtime = Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis() + LoginActivity.serverTimeOffset;
 				dbHelper.insertHighlight(LoginActivity.bookID, selidref, selcfi, 1, "", unixtime, random);
 
@@ -1360,84 +1330,99 @@ public class WebViewActivity extends FragmentActivity implements
 			if (!quiet)
 				Log.d(TAG, "getHighlight:" + response);
 
-			try {
-				final JSONObject selJson = new JSONObject(response);
-				final String id = selJson.getString("id");
-				final String selectedText = selJson.getString("selectedText");
+			if (!highlightDlgOpen) {
+				try {
+					final JSONObject selJson = new JSONObject(response);
+					final String id = selJson.getString("id");
+					final String selectedText = selJson.getString("selectedText");
 
-			// this should be real json parsing if there will be more data that
-			// needs to be extracted
+					// this should be real json parsing if there will be more data that
+					// needs to be extracted
 
-			final DBHelper dbHelper = new DBHelper(WebViewActivity.this);
-			final DBCursor cursor = dbHelper.getHighlight(LoginActivity.bookID, Integer.parseInt(id));
-			final DBCursor cursor2 = dbHelper.getLocation(LoginActivity.bookID);
+					final DBHelper dbHelper = DBHelper.getInstance(WebViewActivity.this);//new DBHelper(WebViewActivity.this);
+					final DBCursor cursor = dbHelper.getHighlight(LoginActivity.bookID, Integer.parseInt(id));
+					final DBCursor cursor2 = dbHelper.getLocation(LoginActivity.bookID);
 
-			final EditText editText = new EditText(WebViewActivity.this);
-			editText.setLines(3);
-			editText.setId(android.R.id.edit);
-			editText.setHint("Notes");
-			editText.setText(cursor.getColNote());
+					final EditText editText = new EditText(WebViewActivity.this);
+					editText.setLines(3);
+					editText.setId(android.R.id.edit);
+					editText.setHint("Notes");
+					editText.setText(cursor.getColNote());
 
-			AlertDialog.Builder builder = new AlertDialog.Builder(
-					WebViewActivity.this)
-					//.setTitle("")
-					//.setMessage(id)
-					.setView(editText)
-					.setCancelable(true)
-					.setNegativeButton("Delete", new DialogInterface.OnClickListener() {
-						@Override
-						public void onClick(DialogInterface dialog, int which) {
-							runOnUiThread(new Runnable() {
+					AlertDialog.Builder builder = new AlertDialog.Builder(
+							WebViewActivity.this)
+							//.setTitle("")
+							//.setMessage(id)
+							.setView(editText)
+							.setOnCancelListener(new DialogInterface.OnCancelListener() {
 								@Override
-								public void run() {
-									mReadiumJSApi.updateLocation(cursor2.getColLastUpdated(), Integer.parseInt(id), true);
-								}});
-							dialog.dismiss();
-						}
-					})
-					.setNeutralButton("Share", new DialogInterface.OnClickListener() {
-						@Override
-						public void onClick(DialogInterface dialog, int which) {
-							try {
-								String shareurl = URLEncoder.encode("{\"idref\":\""+cursor.getColIDRef()+"\",\"elementCfi\":\""+cursor.getColCFI()+"\"}", "UTF-8");
-								Intent sharingIntent = new Intent(Intent.ACTION_SEND);
-								sharingIntent.setType("text/plain");
-								sharingIntent.putExtra(Intent.EXTRA_TEXT, "https://read.biblemesh.com/book/"+LoginActivity.bookID+"?goto="+shareurl+"&highlight="+URLEncoder.encode(selectedText));
-								startActivity(Intent.createChooser(sharingIntent, "Share via"));
-
-								dialog.dismiss();
-							} catch (UnsupportedEncodingException e) {
-								e.printStackTrace();
-							}
-						}
-					})
-					.setPositiveButton("Save",
-					new DialogInterface.OnClickListener() {
-						@Override
-						public void onClick(DialogInterface dialog, int which) {
-							dbHelper.updateHighlight(cursor.getColID(), LoginActivity.bookID, cursor.getColColor(), editText.getText().toString(), cursor.getColLastUpdated(), Integer.parseInt(id));
-
-
-							runOnUiThread(new Runnable() {
-								@Override
-								public void run() {
-									mReadiumJSApi.updateLocation(cursor2.getColLastUpdated(), Integer.parseInt(id), false);
+								public void onCancel(DialogInterface dialog) {
+									// dialog dismiss without button press
+									highlightDlgOpen = false;
 								}
-							});
-							dialog.dismiss();
+							})
+							.setCancelable(true)
+							.setNegativeButton("Delete", new DialogInterface.OnClickListener() {
+								@Override
+								public void onClick(DialogInterface dialog, int which) {
+									runOnUiThread(new Runnable() {
+										@Override
+										public void run() {
+											mReadiumJSApi.updateLocation(cursor2.getColLastUpdated(), Integer.parseInt(id), true);
+										}
+									});
+									dialog.dismiss();
+									highlightDlgOpen = false;
+								}
+							})
+							.setNeutralButton("Share", new DialogInterface.OnClickListener() {
+								@Override
+								public void onClick(DialogInterface dialog, int which) {
+									try {
+										String shareurl = URLEncoder.encode("{\"idref\":\"" + cursor.getColIDRef() + "\",\"elementCfi\":\"" + cursor.getColCFI() + "\"}", "UTF-8");
+										Intent sharingIntent = new Intent(Intent.ACTION_SEND);
+										sharingIntent.setType("text/plain");
+										sharingIntent.putExtra(Intent.EXTRA_TEXT, "https://read.biblemesh.com/book/" + LoginActivity.bookID + "?goto=" + shareurl + "&highlight=" + URLEncoder.encode(selectedText));
+										startActivity(Intent.createChooser(sharingIntent, "Share via"));
 
-						}
-					});
-			//builder.setNegativeButton(android.R.string.cancel, null);
-			builder.show();
+										dialog.dismiss();
+										highlightDlgOpen = false;
+									} catch (UnsupportedEncodingException e) {
+										e.printStackTrace();
+									}
+								}
+							})
+							.setPositiveButton("Save",
+									new DialogInterface.OnClickListener() {
+										@Override
+										public void onClick(DialogInterface dialog, int which) {
+											dbHelper.updateHighlight(cursor.getColID(), LoginActivity.bookID, cursor.getColColor(), editText.getText().toString(), cursor.getColLastUpdated(), Integer.parseInt(id));
 
-			} catch (JSONException e) {
-				e.printStackTrace();
+
+											runOnUiThread(new Runnable() {
+												@Override
+												public void run() {
+													mReadiumJSApi.updateLocation(cursor2.getColLastUpdated(), Integer.parseInt(id), false);
+												}
+											});
+											dialog.dismiss();
+											highlightDlgOpen = false;
+
+										}
+									});
+					//builder.setNegativeButton(android.R.string.cancel, null);
+					builder.show();
+					highlightDlgOpen = true;
+
+				} catch (JSONException e) {
+					e.printStackTrace();
+				}
 			}
 		}
 	}
 
 	private ActionMode mActionMode = null;
+	Boolean highlightDlgOpen = false;
 
 	@Override
 	public void onActionModeStarted(ActionMode mode) {
@@ -1477,14 +1462,17 @@ public class WebViewActivity extends FragmentActivity implements
 		super.onActionModeFinished(mode);
 	}
 
-/*
 	//http://stackoverflow.com/questions/14390908/how-to-control-the-android-webview-history-back-stack
 	@Override
 	public void onBackPressed() {
-		if (mWebview.canGoBack()) {
+		/*if (mWebview.canGoBack()) {
 			mWebview.goBack();
-		} else {
-			super.onBackPressed();
+		} else {*/
+		if (highlightDlgOpen) {
+			highlightDlgOpen = false;
 		}
-	}*/
+			super.onBackPressed();
+		//}
+
+	}
 }

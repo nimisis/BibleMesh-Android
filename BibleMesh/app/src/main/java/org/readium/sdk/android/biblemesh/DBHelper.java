@@ -11,6 +11,7 @@ import android.util.Log;
  */
 
 public class DBHelper extends SQLiteOpenHelper {
+	private static DBHelper mInstance = null;
 	private static final String DATABASE_NAME = "epubtitle.db";
 	private static final int DATABASE_VERSION = 1;
 	private static final String BOOKS_TABLE_CREATE =
@@ -49,6 +50,17 @@ public class DBHelper extends SQLiteOpenHelper {
 
 	public DBHelper(Context context) {
 		super(context, DATABASE_NAME, null, DATABASE_VERSION);
+	}
+
+	public static DBHelper getInstance(Context ctx) {
+
+		// Use the application context, which will ensure that you
+		// don't accidentally leak an Activity's context.
+		// See this article for more information: http://bit.ly/6LRzfx
+		if (mInstance == null) {
+			mInstance = new DBHelper(ctx.getApplicationContext());
+		}
+		return mInstance;
 	}
 
 	public DBCursor getLocations() {
