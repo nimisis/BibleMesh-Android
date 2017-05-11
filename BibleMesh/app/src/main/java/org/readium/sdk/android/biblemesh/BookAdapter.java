@@ -17,11 +17,13 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
 
 	private final Activity activity;
 	private final List<EPubTitle> frontBooks;
+	public ImageLoader imageLoader;
 
 	public BookAdapter(Activity activity, List<EPubTitle> objects) {//}, int layout) {
 		super(activity, R.layout.container_list, objects);
 		this.activity = activity;
         this.frontBooks = objects;
+		imageLoader=new ImageLoader(activity.getApplicationContext());
     }
 
     @Override
@@ -30,7 +32,7 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
         View rowView = convertView;
         BookView sqView = null;
 
-        if(convertView == null) {
+        //if(convertView == null) {
 			LayoutInflater inflater = activity.getLayoutInflater();
             rowView = inflater.inflate(R.layout.listbooks, null);
 
@@ -41,16 +43,20 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
 	        sqView.title = (TextView) rowView.findViewById(R.id.title);
 	        sqView.status = (TextView) rowView.findViewById(R.id.status);
 	        sqView.cover = (ImageView) rowView.findViewById(R.id.cover);
+	        //sqView.position = position;
+
+	        //sqView.cover.setImageBitmap(null);
 
 	        //http://stackoverflow.com/questions/5776851/load-image-from-url
 
 	        //sqView.author.setVisibility(View.VISIBLE);
 	        //sqView.cover.setVisibility(View.VISIBLE);
 
-            rowView.setTag(sqView);
+        /*    rowView.setTag(sqView);
         } else {
+	        Log.e("shared", "pos" + position + " gettag");
 	        sqView = (BookView) rowView.getTag();
-        }
+        }*/
 
         sqView.title.setText(frontBooks.get(position).title);
         sqView.author.setText(frontBooks.get(position).author);
@@ -65,24 +71,13 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
 			        sqView.status.setText("");
 			        break;
 	        }
-	    //if (frontBooks.get(position) != null) {
-		    if (frontBooks.get(position).cover == null) {
-			    sqView.cover.setImageBitmap(null);
-			    Log.e("shared", "pos" + position + " is null");
-			    /*if (frontBooks.get(position).coverHref != null) {
-				    if (frontBooks.get(position).coverHref.equals("")) {
-				    } else {*/
-					    /*new DownloadImageTask(frontBooks.get(position), sqView.cover)
-							    .execute("https://read.biblemesh.com/" + frontBooks.get(position).coverHref);*/
-					    new DownloadImageTask(frontBooks.get(position), sqView.cover)
-							    .execute("https://read.biblemesh.com/epub_content/book_"+frontBooks.get(position).bookID.toString()+"/cover_thumbnail_created_on_import.png");
-				//	}
-			    //}
-		    } else {
+		    //if (frontBooks.get(position).cover == null) {
+			    //Log.e("shared", "pos" + position + " is null");
+			    imageLoader.DisplayImage("https://read.biblemesh.com/epub_content/book_"+frontBooks.get(position).bookID.toString()+"/cover_thumbnail_created_on_import.png", sqView.cover);
+			/*} else {
+			    Log.e("shared", "pos" + position + " setbitmap");
 			    sqView.cover.setImageBitmap(frontBooks.get(position).cover);
-		    }
-
-
+		    }*/
         return rowView;
 	}
 
@@ -91,6 +86,7 @@ public class BookAdapter extends ArrayAdapter<EPubTitle> {
 	    protected TextView author;
 	    protected TextView status;
         protected ImageView cover;
+	    //protected Integer position;
     }
 }
 

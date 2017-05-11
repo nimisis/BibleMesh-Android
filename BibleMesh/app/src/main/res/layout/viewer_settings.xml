@@ -21,19 +21,38 @@
                 style="?android:attr/listSeparatorTextViewStyle"
                 android:paddingLeft="8dp"/>
 
-            <EditText android:hint="@string/fontSize"
-                android:id="@+id/fontSize"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:layout_marginBottom="8dp"
-                android:layout_marginTop="8dp" />
-
+            <LinearLayout
+                android:layout_width="fill_parent"
+                android:layout_height="fill_parent"
+                android:orientation="horizontal">
+                <EditText android:id="@+id/fontSize"
+                          android:layout_width="wrap_content"
+                          android:layout_height="wrap_content"
+                          android:layout_weight="1"
+                          android:layout_marginBottom="8dp"
+                          android:layout_marginTop="8dp"
+                          android:hint="@string/fontSize"
+                          android:inputType="number"/>
+                <Button
+                    android:id="@+id/minusbutton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_weight="1" android:text="-10%"/>
+                <Button
+                    android:id="@+id/plusbutton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_weight="1" android:text="+10%"/>
+            </LinearLayout>
             <TextView android:text="@string/columnGap"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                style="?android:attr/listSeparatorTextViewStyle"
-                android:paddingLeft="8dp" />
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      style="?android:attr/listSeparatorTextViewStyle"
+                      android:paddingLeft="8dp" />
 
             <EditText android:hint="@string/columnGap"
                 android:id="@+id/columnGap"

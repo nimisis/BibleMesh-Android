@@ -40,10 +40,13 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RadioGroup;
 
 import java.io.Serializable;
+
+import static java.lang.Integer.parseInt;
 
 /**
  * This dialog displays the viewer settings to the user.
@@ -122,6 +125,27 @@ public class ViewerSettingsDialog extends DialogFragment {
         final EditText columnGapText = (EditText) dialogView.findViewById(R.id.columnGap);
         columnGapText.setText("" + mOriginalSettings.getColumnGap());
 
+		final Button minusFont = (Button) dialogView.findViewById(R.id.minusbutton);
+		minusFont.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				Integer f = Integer.parseInt(fontSizeText.getText().toString());
+				f -= 10;
+				if (f > 0) {
+					fontSizeText.setText(f.toString());
+				}
+			}
+		});
+
+		final Button plusFont = (Button) dialogView.findViewById(R.id.plusbutton);
+		plusFont.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				Integer f = Integer.parseInt(fontSizeText.getText().toString());
+				f += 10;
+				fontSizeText.setText(f.toString());
+			}
+		});
 
         builder.setView(dialogView)
                 .setTitle(R.string.settings)
@@ -166,7 +190,7 @@ public class ViewerSettingsDialog extends DialogFragment {
 
                     private int parseString(String s, int defaultValue) {
                         try {
-                            return Integer.parseInt(s);
+                            return parseInt(s);
                         } catch (Exception e) {
                             Log.e(TAG, "" + e.getMessage(), e);
                         }

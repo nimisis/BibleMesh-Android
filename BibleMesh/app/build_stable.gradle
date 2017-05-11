@@ -5,8 +5,8 @@ android {
     buildToolsVersion = "23.0.3"
 
     defaultConfig {
-        applicationId = "org.readium.sdk.android.biblemesh"
-        //applicationId = "com.biblemesh.ereader"
+        //applicationId = "org.readium.sdk.android.biblemesh"
+        applicationId = "com.biblemesh.ereader"
         minSdkVersion 16
         targetSdkVersion 23
     }
