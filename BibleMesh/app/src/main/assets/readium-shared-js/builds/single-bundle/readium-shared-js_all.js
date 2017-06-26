@@ -11795,1651 +11795,6 @@ if ( !noGlobal ) {
 return jQuery;
 }));
 
-//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
-//  
-//  Redistribution and use in source and binary forms, with or without modification, 
-//  are permitted provided that the following conditions are met:
-//  1. Redistributions of source code must retain the above copyright notice, this 
-//  list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright notice, 
-//  this list of conditions and the following disclaimer in the documentation and/or 
-//  other materials provided with the distribution.
-//  3. Neither the name of the organization nor the names of its contributors may be 
-//  used to endorse or promote products derived from this software without specific 
-//  prior written permission.
-
-(function(global) {
-
-
-// Description: This is a set of runtime errors that the CFI interpreter can throw. 
-// Rationale: These error types extend the basic javascript error object so error things like the stack trace are 
-//   included with the runtime errors. 
-
-// REFACTORING CANDIDATE: This type of error may not be required in the long run. The parser should catch any syntax errors, 
-//   provided it is error-free, and as such, the AST should never really have any node type errors, which are essentially errors
-//   in the structure of the AST. This error should probably be refactored out when the grammar and interpreter are more stable.
-
-var obj = {
-
-NodeTypeError: function (node, message) {
-
-    function NodeTypeError () {
-
-        this.node = node;
-    }
-
-    NodeTypeError.prototype = new Error(message);
-    NodeTypeError.constructor = NodeTypeError;
-
-    return new NodeTypeError();
-},
-
-// REFACTORING CANDIDATE: Might make sense to include some more specifics about the out-of-rangeyness.
-OutOfRangeError: function (targetIndex, maxIndex, message) {
-
-    function OutOfRangeError () {
-
-        this.targetIndex = targetIndex;
-        this.maxIndex = maxIndex;
-    }
-
-    OutOfRangeError.prototype = new Error(message);
-    OutOfRangeError.constructor = OutOfRangeError()
-
-    return new OutOfRangeError();
-},
-
-// REFACTORING CANDIDATE: This is a bit too general to be useful. When I have a better understanding of the type of errors
-//   that can occur with the various terminus conditions, it'll make more sense to revisit this. 
-TerminusError: function (terminusType, terminusCondition, message) {
-
-    function TerminusError () {
-
-        this.terminusType = terminusType;
-        this.terminusCondition = terminusCondition;
-    }
-
-    TerminusError.prototype = new Error(message);
-    TerminusError.constructor = TerminusError();
-
-    return new TerminusError();
-},
-
-CFIAssertionError: function (expectedAssertion, targetElementAssertion, message) {
-
-    function CFIAssertionError () {
-
-        this.expectedAssertion = expectedAssertion;
-        this.targetElementAssertion = targetElementAssertion;
-    }
-
-    CFIAssertionError.prototype = new Error(message);
-    CFIAssertionError.constructor = CFIAssertionError();
-
-    return new CFIAssertionError();
-}
-
-};
-
-
-
-
-
-
-
-
-
-
-if (typeof define == 'function' && typeof define.amd == 'object') {
-    console.log("RequireJS ... cfi_errors");
-    
-    define('readium_cfi_js/cfi_runtime_errors',[],
-    function () {
-        return obj;
-    });
-} else {
-    console.log("!RequireJS ... cfi_errors");
-    
-    if (!global["EPUBcfi"]) {
-        throw new Error("EPUBcfi not initialised on global object?! (window or this context)");
-    }
-    
-    global.EPUBcfi.NodeTypeError = obj.NodeTypeError;
-    global.EPUBcfi.OutOfRangeError = obj.OutOfRangeError;
-    global.EPUBcfi.TerminusError = obj.TerminusError;
-    global.EPUBcfi.CFIAssertionError = obj.CFIAssertionError;
-}
-
-})(typeof window !== "undefined" ? window : this);
-
-//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
-//  
-//  Redistribution and use in source and binary forms, with or without modification, 
-//  are permitted provided that the following conditions are met:
-//  1. Redistributions of source code must retain the above copyright notice, this 
-//  list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright notice, 
-//  this list of conditions and the following disclaimer in the documentation and/or 
-//  other materials provided with the distribution.
-//  3. Neither the name of the organization nor the names of its contributors may be 
-//  used to endorse or promote products derived from this software without specific 
-//  prior written permission.
-
-(function(global) {
-
-var init = function($, cfiRuntimeErrors) {
-    
-var obj = {
-
-// Description: This model contains the implementation for "instructions" included in the EPUB CFI domain specific language (DSL). 
-//   Lexing and parsing a CFI produces a set of executable instructions for processing a CFI (represented in the AST). 
-//   This object contains a set of functions that implement each of the executable instructions in the AST. 
-
-    // ------------------------------------------------------------------------------------ //
-    //  "PUBLIC" METHODS (THE API)                                                          //
-    // ------------------------------------------------------------------------------------ //
-
-    // Description: Follows a step
-    // Rationale: The use of children() is important here, as this jQuery method returns a tree of xml nodes, EXCLUDING
-    //   CDATA and text nodes. When we index into the set of child elements, we are assuming that text nodes have been 
-    //   excluded.
-    // REFACTORING CANDIDATE: This should be called "followIndexStep"
-    getNextNode : function (CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist) {
-
-        // Find the jquery index for the current node
-        var $targetNode;
-        if (CFIStepValue % 2 == 0) {
-
-            $targetNode = this.elementNodeStep(CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist);
-        }
-        else {
-
-            $targetNode = this.inferTargetTextNode(CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist);
-        }
-
-        return $targetNode;
-    },
-
-    // Description: This instruction executes an indirection step, where a resource is retrieved using a 
-    //   link contained on a attribute of the target element. The attribute that contains the link differs
-    //   depending on the target. 
-    // Note: Iframe indirection will (should) fail if the iframe is not from the same domain as its containing script due to 
-    //   the cross origin security policy
-    followIndirectionStep : function (CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var that = this;
-        var $contentDocument; 
-        var $blacklistExcluded;
-        var $startElement;
-        var $targetNode;
-
-        // TODO: This check must be expanded to all the different types of indirection step
-        // Only expects iframes, at the moment
-        if ($currNode === undefined || !$currNode.is("iframe")) {
-
-            throw cfiRuntimeErrors.NodeTypeError($currNode, "expected an iframe element");
-        }
-
-        // Check node type; only iframe indirection is handled, at the moment
-        if ($currNode.is("iframe")) {
-
-            // Get content
-            $contentDocument = $currNode.contents();
-
-            // Go to the first XHTML element, which will be the first child of the top-level document object
-            $blacklistExcluded = this.applyBlacklist($contentDocument.children(), classBlacklist, elementBlacklist, idBlacklist);
-            $startElement = $($blacklistExcluded[0]);
-
-            // Follow an index step
-            $targetNode = this.getNextNode(CFIStepValue, $startElement, classBlacklist, elementBlacklist, idBlacklist);
-
-            // Return that shit!
-            return $targetNode; 
-        }
-
-        // TODO: Other types of indirection
-        // TODO: $targetNode.is("embed")) : src
-        // TODO: ($targetNode.is("object")) : data
-        // TODO: ($targetNode.is("image") || $targetNode.is("xlink:href")) : xlink:href
-    },
-
-    // Description: Injects an element at the specified text node
-    // Arguments: a cfi text termination string, a jquery object to the current node
-    // REFACTORING CANDIDATE: Rename this to indicate that it injects into a text terminus
-    textTermination : function ($currNode, textOffset, elementToInject) {
-
-        var $injectedElement;
-        // Get the first node, this should be a text node
-        if ($currNode === undefined) {
-
-            throw cfiRuntimeErrors.NodeTypeError($currNode, "expected a terminating node, or node list");
-        } 
-        else if ($currNode.length === 0) {
-
-            throw cfiRuntimeErrors.TerminusError("Text", "Text offset:" + textOffset, "no nodes found for termination condition");
-        }
-
-        $injectedElement = this.injectCFIMarkerIntoText($currNode, textOffset, elementToInject);
-        return $injectedElement;
-    },
-
-    // Description: Checks that the id assertion for the node target matches that on 
-    //   the found node. 
-    targetIdMatchesIdAssertion : function ($foundNode, idAssertion) {
-
-        if ($foundNode.attr("id") === idAssertion) {
-
-            return true;
-        }
-        else {
-
-            return false;
-        }
-    },
-
-    // ------------------------------------------------------------------------------------ //
-    //  "PRIVATE" HELPERS                                                                   //
-    // ------------------------------------------------------------------------------------ //
-
-    // Description: Step reference for xml element node. Expected that CFIStepValue is an even integer
-    elementNodeStep : function (CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var $targetNode;
-        var $blacklistExcluded;
-        var numElements;
-        var jqueryTargetNodeIndex = (CFIStepValue / 2) - 1;
-
-        $blacklistExcluded = this.applyBlacklist($currNode.children(), classBlacklist, elementBlacklist, idBlacklist);
-        numElements = $blacklistExcluded.length;
-
-        if (this.indexOutOfRange(jqueryTargetNodeIndex, numElements)) {
-
-            throw cfiRuntimeErrors.OutOfRangeError(jqueryTargetNodeIndex, numElements - 1, "");
-        }
-
-        $targetNode = $($blacklistExcluded[jqueryTargetNodeIndex]);
-        return $targetNode;
-    },
-
-    retrieveItemRefHref : function ($itemRefElement, $packageDocument) {
-
-        return $("#" + $itemRefElement.attr("idref"), $packageDocument).attr("href");
-    },
-
-    indexOutOfRange : function (targetIndex, numChildElements) {
-
-        return (targetIndex > numChildElements - 1) ? true : false;
-    },
-
-    // Rationale: In order to inject an element into a specific position, access to the parent object 
-    //   is required. This is obtained with the jquery parent() method. An alternative would be to 
-    //   pass in the parent with a filtered list containing only children that are part of the target text node.
-    injectCFIMarkerIntoText : function ($textNodeList, textOffset, elementToInject) {
-        var document = $textNodeList[0].ownerDocument;
-
-        var nodeNum;
-        var currNodeLength;
-        var currTextPosition = 0;
-        var nodeOffset;
-        var originalText;
-        var $injectedNode;
-        var $newTextNode;
-        // The iteration counter may be incorrect here (should be $textNodeList.length - 1 ??)
-        for (nodeNum = 0; nodeNum <= $textNodeList.length; nodeNum++) {
-
-            if ($textNodeList[nodeNum].nodeType === Node.TEXT_NODE) {
-
-                currNodeMaxIndex = $textNodeList[nodeNum].nodeValue.length  + currTextPosition;
-                nodeOffset = textOffset - currTextPosition;
-
-                if (currNodeMaxIndex > textOffset) {
-
-                    // This node is going to be split and the components re-inserted
-                    originalText = $textNodeList[nodeNum].nodeValue;    
-
-                    // Before part
-                    $textNodeList[nodeNum].nodeValue = originalText.slice(0, nodeOffset);
-
-                    // Injected element
-                    $injectedNode = $(elementToInject).insertAfter($textNodeList.eq(nodeNum));
-
-                    // After part
-                    $newTextNode = $(document.createTextNode(originalText.slice(nodeOffset, originalText.length)));
-                    $($newTextNode).insertAfter($injectedNode);
-
-                    return $injectedNode;
-                } else if (currNodeMaxIndex == textOffset){
-                    $injectedNode = $(elementToInject).insertAfter($textNodeList.eq(nodeNum));
-                    return $injectedNode;
-                }
-                else {
-                    currTextPosition = currNodeMaxIndex;
-                }
-            } else if($textNodeList[nodeNum].nodeType === Node.COMMENT_NODE){
-                currNodeMaxIndex = $textNodeList[nodeNum].nodeValue.length + 7 + currTextPosition;
-                currTextPosition = currNodeMaxIndex;
-            } else if($textNodeList[nodeNum].nodeType === Node.PROCESSING_INSTRUCTION_NODE){
-                currNodeMaxIndex = $textNodeList[nodeNum].nodeValue.length + $textNodeList[nodeNum].target.length + 5
-                currTextPosition = currNodeMaxIndex;
-            }
-        }
-
-        throw cfiRuntimeErrors.TerminusError("Text", "Text offset:" + textOffset, "The offset exceeded the length of the text");
-    },
-
-    // Rationale: In order to inject an element into a specific position, access to the parent object 
-    //   is required. This is obtained with the jquery parent() method. An alternative would be to 
-    //   pass in the parent with a filtered list containing only children that are part of the target text node.
-
-    // Description: This method finds a target text node and then injects an element into the appropriate node
-    // Rationale: The possibility that cfi marker elements have been injected into a text node at some point previous to 
-    //   this method being called (and thus splitting the original text node into two separate text nodes) necessitates that
-    //   the set of nodes that compromised the original target text node are inferred and returned.
-    // Notes: Passed a current node. This node should have a set of elements under it. This will include at least one text node, 
-    //   element nodes (maybe), or possibly a mix. 
-    // REFACTORING CANDIDATE: This method is pretty long (and confusing). Worth investigating to see if it can be refactored into something clearer.
-    inferTargetTextNode : function (CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist) {
-        
-        var $elementsWithoutMarkers;
-        var currLogicalTextNodeIndex;
-        var targetLogicalTextNodeIndex;
-        var nodeNum;
-        var $targetTextNodeList;
-        var prevNodeWasTextNode;
-
-        // Remove any cfi marker elements from the set of elements. 
-        // Rationale: A filtering function is used, as simply using a class selector with jquery appears to 
-        //   result in behaviour where text nodes are also filtered out, along with the class element being filtered.
-        $elementsWithoutMarkers = this.applyBlacklist($currNode.contents(), classBlacklist, elementBlacklist, idBlacklist);
-
-        // Convert CFIStepValue to logical index; assumes odd integer for the step value
-        targetLogicalTextNodeIndex = ((parseInt(CFIStepValue) + 1) / 2) - 1;
-
-        // Set text node position counter
-        currLogicalTextNodeIndex = 0;
-        prevNodeWasTextNode = false;
-        $targetTextNodeList = $elementsWithoutMarkers.filter(
-            function () {
-
-                if (currLogicalTextNodeIndex === targetLogicalTextNodeIndex) {
-
-                    // If it's a text node
-                    if (this.nodeType === Node.TEXT_NODE || this.nodeType === Node.COMMENT_NODE || this.nodeType === Node.PROCESSING_INSTRUCTION_NODE) {
-                        prevNodeWasTextNode = true;
-                        return true;
-                    }
-                    // Rationale: The logical text node position is only incremented once a group of text nodes (a single logical
-                    //   text node) has been passed by the loop. 
-                    else if (prevNodeWasTextNode && (this.nodeType !== Node.TEXT_NODE)) {
-                        currLogicalTextNodeIndex++;
-                        prevNodeWasTextNode = false;
-                        return false;
-                    }
-                }
-                // Don't return any elements
-                else {
-
-                    if (this.nodeType === Node.TEXT_NODE || this.nodeType === Node.COMMENT_NODE || this.nodeType === Node.PROCESSING_INSTRUCTION_NODE) {
-                        prevNodeWasTextNode = true;
-                    }else if (!prevNodeWasTextNode && this.nodeType === Node.ELEMENT_NODE){
-                        currLogicalTextNodeIndex++;
-                        prevNodeWasTextNode = true;
-                    }
-                    else if (prevNodeWasTextNode && (this.nodeType !== Node.TEXT_NODE) && (this !== $elementsWithoutMarkers.lastChild)) {
-                        currLogicalTextNodeIndex++;
-                        prevNodeWasTextNode = false;
-                    }
-
-                    return false;
-                }
-            }
-        );
-
-        // The filtering above should have counted the number of "logical" text nodes; this can be used to 
-        // detect out of range errors
-        if ($targetTextNodeList.length === 0) {
-            throw cfiRuntimeErrors.OutOfRangeError(targetLogicalTextNodeIndex, currLogicalTextNodeIndex, "Index out of range");
-        }
-
-        // return the text node list
-        return $targetTextNodeList;
-    },
-
-    applyBlacklist : function ($elements, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var $filteredElements;
-
-        $filteredElements = $elements.filter(
-            function () {
-
-                var $currElement = $(this);
-                var includeInList = true;
-
-                if (classBlacklist) {
-
-                    // Filter each element with the class type
-                    $.each(classBlacklist, function (index, value) {
-
-                        if ($currElement.hasClass(value)) {
-                            includeInList = false;
-
-                            // Break this loop
-                            return false;
-                        }
-                    });
-                }
-
-                if (elementBlacklist) {
-                    
-                    // For each type of element
-                    $.each(elementBlacklist, function (index, value) {
-
-                        if ($currElement.is(value)) {
-                            includeInList = false;
-
-                            // Break this loop
-                            return false;
-                        }
-                    });
-                }
-
-                if (idBlacklist) {
-                    
-                    // For each type of element
-                    $.each(idBlacklist, function (index, value) {
-
-                        if ($currElement.attr("id") === value) {
-                            includeInList = false;
-
-                            // Break this loop
-                            return false;
-                        }
-                    });
-                }
-
-                return includeInList;
-            }
-        );
-
-        return $filteredElements;
-    }
-};
-
-return obj;
-}
-
-
-
-
-
-
-
-
-
-
-if (typeof define == 'function' && typeof define.amd == 'object') {
-    console.log("RequireJS ... cfi_instructions");
-    
-    define('readium_cfi_js/cfi_instructions',['jquery', './cfi_runtime_errors'],
-    function ($, cfiRuntimeErrors) {
-        return init($, cfiRuntimeErrors);
-    });
-} else {
-    console.log("!RequireJS ... cfi_instructions");
-    
-    if (!global["EPUBcfi"]) {
-        throw new Error("EPUBcfi not initialised on global object?! (window or this context)");
-    }
-    global.EPUBcfi.CFIInstructions = 
-    init($,
-        {
-            NodeTypeError: global.EPUBcfi.NodeTypeError,
-            OutOfRangeError: global.EPUBcfi.OutOfRangeError,
-            TerminusError: global.EPUBcfi.TerminusError,
-            CFIAssertionError: global.EPUBcfi.CFIAssertionError
-        });
-}
-
-})(typeof window !== "undefined" ? window : this);
-
-//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
-//
-//  Redistribution and use in source and binary forms, with or without modification,
-//  are permitted provided that the following conditions are met:
-//  1. Redistributions of source code must retain the above copyright notice, this
-//  list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright notice,
-//  this list of conditions and the following disclaimer in the documentation and/or
-//  other materials provided with the distribution.
-//  3. Neither the name of the organization nor the names of its contributors may be
-//  used to endorse or promote products derived from this software without specific
-//  prior written permission.
-
-(function(global) {
-
-var init = function($, cfiParser, cfiInstructions, cfiRuntimeErrors) {
-
-    if (typeof cfiParser === "undefined") {
-        throw new Error("UNDEFINED?! cfiParser");
-    }
-
-    if (typeof cfiInstructions === "undefined") {
-        throw new Error("UNDEFINED?! cfiInstructions");
-    }
-
-    if (typeof cfiRuntimeErrors === "undefined") {
-        throw new Error("UNDEFINED?! cfiRuntimeErrors");
-    }
-
-var obj = {
-
-// Description: This is an interpreter that inteprets an Abstract Syntax Tree (AST) for a CFI. The result of executing the interpreter
-//   is to inject an element, or set of elements, into an EPUB content document (which is just an XHTML document). These element(s) will
-//   represent the position or area in the EPUB referenced by a CFI.
-// Rationale: The AST is a clean and readable expression of the step-terminus structure of a CFI. Although building an interpreter adds to the
-//   CFI infrastructure, it provides a number of benefits. First, it emphasizes a clear separation of concerns between lexing/parsing a
-//   CFI, which involves some complexity related to escaped and special characters, and the execution of the underlying set of steps
-//   represented by the CFI. Second, it will be easier to extend the interpreter to account for new/altered CFI steps (say for references
-//   to vector objects or multiple CFIs) than if lexing, parsing and interpretation were all handled in a single step. Finally, Readium's objective is
-//   to demonstrate implementation of the EPUB 3.0 spec. An implementation with a strong separation of concerns that conforms to
-//   well-understood patterns for DSL processing should be easier to communicate, analyze and understand.
-// REFACTORING CANDIDATE: node type errors shouldn't really be possible if the CFI syntax is correct and the parser is error free.
-//   Might want to make the script die in those instances, once the grammar and interpreter are more stable.
-// REFACTORING CANDIDATE: The use of the 'nodeType' property is confusing as this is a DOM node property and the two are unrelated.
-//   Whoops. There shouldn't be any interference, however, I think this should be changed.
-
-    // ------------------------------------------------------------------------------------ //
-    //  "PUBLIC" METHODS (THE API)                                                          //
-    // ------------------------------------------------------------------------------------ //
-
-    // Description: Find the content document referenced by the spine item. This should be the spine item
-    //   referenced by the first indirection step in the CFI.
-    // Rationale: This method is a part of the API so that the reading system can "interact" the content document
-    //   pointed to by a CFI. If this is not a separate step, the processing of the CFI must be tightly coupled with
-    //   the reading system, as it stands now.
-    getContentDocHref : function (CFI, packageDocument, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var $packageDocument = $(packageDocument);
-        var decodedCFI = decodeURI(CFI);
-        var CFIAST = cfiParser.parse(decodedCFI);
-
-        if (!CFIAST || CFIAST.type !== "CFIAST") {
-            throw cfiRuntimeErrors.NodeTypeError(CFIAST, "expected CFI AST root node");
-        }
-
-        // Interpet the path node (the package document step)
-        var $packageElement = $($("package", $packageDocument)[0]);
-        var $currElement = this.interpretIndexStepNode(CFIAST.cfiString.path, $packageElement, classBlacklist, elementBlacklist, idBlacklist);
-        foundHref = this.searchLocalPathForHref($currElement, $packageDocument, CFIAST.cfiString.localPath, classBlacklist, elementBlacklist, idBlacklist);
-
-        if (foundHref) {
-            return foundHref;
-        }
-        else {
-            return undefined;
-        }
-    },
-
-    // Description: Inject an arbitrary html element into a position in a content document referenced by a CFI
-    injectElement : function (CFI, contentDocument, elementToInject, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var decodedCFI = decodeURI(CFI);
-        var CFIAST = cfiParser.parse(decodedCFI);
-        var indirectionNode;
-        var indirectionStepNum;
-        var $currElement;
-
-        // Rationale: Since the correct content document for this CFI is already being passed, we can skip to the beginning
-        //   of the indirection step that referenced the content document.
-        // Note: This assumes that indirection steps and index steps conform to an interface: an object with stepLength, idAssertion
-        indirectionStepNum = this.getFirstIndirectionStepNum(CFIAST);
-        indirectionNode = CFIAST.cfiString.localPath.steps[indirectionStepNum];
-        indirectionNode.type = "indexStep";
-
-        // Interpret the rest of the steps
-        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, indirectionStepNum, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
-
-        // TODO: detect what kind of terminus; for now, text node termini are the only kind implemented
-        $currElement = this.interpretTextTerminusNode(CFIAST.cfiString.localPath.termStep, $currElement, elementToInject);
-
-        // Return the element that was injected into
-        return $currElement;
-    },
-
-    // Description: Inject an arbitrary html element into a position in a content document referenced by a CFI
-    injectRangeElements : function (rangeCFI, contentDocument, startElementToInject, endElementToInject, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var decodedCFI = decodeURI(rangeCFI);
-        var CFIAST = cfiParser.parse(decodedCFI);
-        var indirectionNode;
-        var indirectionStepNum;
-        var $currElement;
-        var $range1TargetElement;
-        var $range2TargetElement;
-
-        // Rationale: Since the correct content document for this CFI is already being passed, we can skip to the beginning
-        //   of the indirection step that referenced the content document.
-        // Note: This assumes that indirection steps and index steps conform to an interface: an object with stepLength, idAssertion
-        indirectionStepNum = this.getFirstIndirectionStepNum(CFIAST);
-        indirectionNode = CFIAST.cfiString.localPath.steps[indirectionStepNum];
-        indirectionNode.type = "indexStep";
-
-        // Interpret the rest of the steps in the first local path
-        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, indirectionStepNum, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
-
-        // Interpret the first range local_path
-        $range1TargetElement = this.interpretLocalPath(CFIAST.cfiString.range1, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-        $range1TargetElement = this.interpretTextTerminusNode(CFIAST.cfiString.range1.termStep, $range1TargetElement, startElementToInject);
-
-        // Interpret the second range local_path
-        $range2TargetElement = this.interpretLocalPath(CFIAST.cfiString.range2, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-        $range2TargetElement = this.interpretTextTerminusNode(CFIAST.cfiString.range2.termStep, $range2TargetElement, endElementToInject);
-
-        // Return the element that was injected into
-        return {
-            startElement : $range1TargetElement[0],
-            endElement : $range2TargetElement[0]
-        };
-    },
-
-    // Description: This method will return the element or node (say, a text node) that is the final target of the
-    //   the CFI.
-    getTargetElement : function (CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var decodedCFI = decodeURI(CFI);
-        var CFIAST = cfiParser.parse(decodedCFI);
-        var indirectionNode;
-        var indirectionStepNum;
-        var $currElement;
-
-        // Rationale: Since the correct content document for this CFI is already being passed, we can skip to the beginning
-        //   of the indirection step that referenced the content document.
-        // Note: This assumes that indirection steps and index steps conform to an interface: an object with stepLength, idAssertion
-        indirectionStepNum = this.getFirstIndirectionStepNum(CFIAST);
-        indirectionNode = CFIAST.cfiString.localPath.steps[indirectionStepNum];
-        indirectionNode.type = "indexStep";
-
-        // Interpret the rest of the steps
-        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, indirectionStepNum, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
-
-        // Return the element at the end of the CFI
-        return $currElement;
-    },
-
-    // Description: This method will return the start and end elements (along with their char offsets) that are the final targets of the range CFI.
-    getRangeTargetElements : function (rangeCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var decodedCFI = decodeURI(rangeCFI);
-        var CFIAST = cfiParser.parse(decodedCFI);
-        var indirectionNode;
-        var indirectionStepNum;
-        var $currElement;
-        var $range1TargetElement;
-        var $range2TargetElement;
-
-        // Rationale: Since the correct content document for this CFI is already being passed, we can skip to the beginning
-        //   of the indirection step that referenced the content document.
-        // Note: This assumes that indirection steps and index steps conform to an interface: an object with stepLength, idAssertion
-        indirectionStepNum = this.getFirstIndirectionStepNum(CFIAST);
-        indirectionNode = CFIAST.cfiString.localPath.steps[indirectionStepNum];
-        indirectionNode.type = "indexStep";
-
-        // Interpret the rest of the steps
-        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, indirectionStepNum, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
-
-        // Interpret first range local_path
-        $range1TargetElement = this.interpretLocalPath(CFIAST.cfiString.range1, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-
-        // Interpret second range local_path
-        $range2TargetElement = this.interpretLocalPath(CFIAST.cfiString.range2, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-
-        // Get the start and end character offsets
-        var startOffset = parseInt(CFIAST.cfiString.range1.termStep.offsetValue) || undefined;
-        var endOffset = parseInt(CFIAST.cfiString.range2.termStep.offsetValue) || undefined;
-
-        // Return the element (and char offsets) at the end of the CFI
-        return {
-            startElement: $range1TargetElement[0],
-            startOffset: startOffset,
-            endElement: $range2TargetElement[0],
-            endOffset: endOffset
-        };
-    },
-
-    // Description: This method allows a "partial" CFI to be used to reference a target in a content document, without a
-    //   package document CFI component.
-    // Arguments: {
-    //     contentDocumentCFI : This is a partial CFI that represents a path in a content document only. This partial must be
-    //        syntactically valid, even though it references a path starting at the top of a content document (which is a CFI that
-    //        that has no defined meaning in the spec.)
-    //     contentDocument : A DOM representation of the content document to which the partial CFI refers.
-    // }
-    // Rationale: This method exists to meet the requirements of the Readium-SDK and should be used with care
-    getTargetElementWithPartialCFI : function (contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var decodedCFI = decodeURI(contentDocumentCFI);
-        var CFIAST = cfiParser.parse(decodedCFI);
-        var indirectionNode;
-
-        // Interpret the path node
-        var $currElement = this.interpretIndexStepNode(CFIAST.cfiString.path, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
-
-        // Interpret the rest of the steps
-        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-
-        // Return the element at the end of the CFI
-        return $currElement;
-    },
-
-    // Description: This method allows a "partial" CFI to be used, with a content document, to return the text node and offset
-    //    referenced by the partial CFI.
-    // Arguments: {
-    //     contentDocumentCFI : This is a partial CFI that represents a path in a content document only. This partial must be
-    //        syntactically valid, even though it references a path starting at the top of a content document (which is a CFI that
-    //        that has no defined meaning in the spec.)
-    //     contentDocument : A DOM representation of the content document to which the partial CFI refers.
-    // }
-    getTextTerminusInfoWithPartialCFI : function (contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var decodedCFI = decodeURI(contentDocumentCFI);
-        var CFIAST = cfiParser.parse(decodedCFI);
-        var indirectionNode;
-        var textOffset;
-
-        // Interpret the path node
-        var $currElement = this.interpretIndexStepNode(CFIAST.cfiString.path, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
-
-        // Interpret the rest of the steps
-        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-
-        // Return the element at the end of the CFI
-        textOffset = parseInt(CFIAST.cfiString.localPath.termStep.offsetValue);
-        return {
-            textNode: $currElement[0],
-            textOffset: textOffset
-        };
-    },
-
-    // Description: This method will return the element or node (say, a text node) that is the final target of the
-    //   the CFI, along with the text terminus offset.
-    getTextTerminusInfo : function (CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var decodedCFI = decodeURI(CFI);
-        var CFIAST = cfiParser.parse(decodedCFI);
-        var indirectionNode;
-        var indirectionStepNum;
-        var $currElement;
-        var textOffset;
-
-        // Rationale: Since the correct content document for this CFI is already being passed, we can skip to the beginning
-        //   of the indirection step that referenced the content document.
-        // Note: This assumes that indirection steps and index steps conform to an interface: an object with stepLength, idAssertion
-        indirectionStepNum = this.getFirstIndirectionStepNum(CFIAST);
-        indirectionNode = CFIAST.cfiString.localPath.steps[indirectionStepNum];
-        indirectionNode.type = "indexStep";
-
-        // Interpret the rest of the steps
-        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, indirectionStepNum, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
-
-        // Return the element at the end of the CFI
-        textOffset = parseInt(CFIAST.cfiString.localPath.termStep.offsetValue);
-        return {
-            textNode: $currElement[0],
-            textOffset: textOffset
-        };
-    },
-
-    // Description: This function will determine if the input "partial" CFI is expressed as a range
-    isRangeCfi: function (cfi) {
-        var CFIAST = cfiParser.parse(cfi);
-        return CFIAST.cfiString.range1 ? true : false;
-    },
-
-    // Description: This function will determine if the input "partial" CFI has a text terminus step
-    hasTextTerminus: function (cfi) {
-        var CFIAST = cfiParser.parse(cfi);
-        return CFIAST.cfiString.localPath.termStep ? true : false;
-    },
-
-    // ------------------------------------------------------------------------------------ //
-    //  "PRIVATE" HELPERS                                                                   //
-    // ------------------------------------------------------------------------------------ //
-
-    getFirstIndirectionStepNum : function (CFIAST) {
-
-        // Find the first indirection step in the local path; follow it like a regular step, as the step in the content document it
-        //   references is already loaded and has been passed to this method
-        var stepNum = 0;
-        for (stepNum; stepNum <= CFIAST.cfiString.localPath.steps.length - 1 ; stepNum++) {
-
-            nextStepNode = CFIAST.cfiString.localPath.steps[stepNum];
-            if (nextStepNode.type === "indirectionStep") {
-                return stepNum;
-            }
-        }
-    },
-
-    // REFACTORING CANDIDATE: cfiString node and start step num could be merged into one argument, by simply passing the
-    //   starting step... probably a good idea, this would make the meaning of this method clearer.
-    interpretLocalPath : function (localPathNode, startStepNum, $currElement, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var stepNum = startStepNum;
-        var nextStepNode;
-        for (stepNum; stepNum <= localPathNode.steps.length - 1 ; stepNum++) {
-
-            nextStepNode = localPathNode.steps[stepNum];
-            if (nextStepNode.type === "indexStep") {
-
-                $currElement = this.interpretIndexStepNode(nextStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-            }
-            else if (nextStepNode.type === "indirectionStep") {
-
-                $currElement = this.interpretIndirectionStepNode(nextStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-            }
-        }
-
-        return $currElement;
-    },
-
-    interpretIndexStepNode : function (indexStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist) {
-
-        // Check node type; throw error if wrong type
-        if (indexStepNode === undefined || indexStepNode.type !== "indexStep") {
-
-            throw cfiRuntimeErrors.NodeTypeError(indexStepNode, "expected index step node");
-        }
-
-        // Index step
-        var $stepTarget = cfiInstructions.getNextNode(indexStepNode.stepLength, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-
-        // Check the id assertion, if it exists
-        if (indexStepNode.idAssertion) {
-
-            if (!cfiInstructions.targetIdMatchesIdAssertion($stepTarget, indexStepNode.idAssertion)) {
-
-                throw cfiRuntimeErrors.CFIAssertionError(indexStepNode.idAssertion, $stepTarget.attr('id'), "Id assertion failed");
-            }
-        }
-
-        return $stepTarget;
-    },
-
-    interpretIndirectionStepNode : function (indirectionStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist) {
-
-        // Check node type; throw error if wrong type
-        if (indirectionStepNode === undefined || indirectionStepNode.type !== "indirectionStep") {
-
-            throw cfiRuntimeErrors.NodeTypeError(indirectionStepNode, "expected indirection step node");
-        }
-
-        // Indirection step
-        var $stepTarget = cfiInstructions.followIndirectionStep(
-            indirectionStepNode.stepLength,
-            $currElement,
-            classBlacklist,
-            elementBlacklist);
-
-        // Check the id assertion, if it exists
-        if (indirectionStepNode.idAssertion) {
-
-            if (!cfiInstructions.targetIdMatchesIdAssertion($stepTarget, indirectionStepNode.idAssertion)) {
-
-                throw cfiRuntimeErrors.CFIAssertionError(indirectionStepNode.idAssertion, $stepTarget.attr('id'), "Id assertion failed");
-            }
-        }
-
-        return $stepTarget;
-    },
-
-    // REFACTORING CANDIDATE: The logic here assumes that a user will always want to use this terminus
-    //   to inject content into the found node. This will not always be the case, and different types of interpretation
-    //   are probably desired.
-    interpretTextTerminusNode : function (terminusNode, $currElement, elementToInject) {
-
-        if (terminusNode === undefined || terminusNode.type !== "textTerminus") {
-
-            throw cfiRuntimeErrors.NodeTypeError(terminusNode, "expected text terminus node");
-        }
-
-        var $injectedElement = cfiInstructions.textTermination(
-            $currElement,
-            terminusNode.offsetValue,
-            elementToInject
-            );
-
-        return $injectedElement;
-    },
-
-    searchLocalPathForHref : function ($currElement, $packageDocument, localPathNode, classBlacklist, elementBlacklist, idBlacklist) {
-
-        // Interpret the first local_path node, which is a set of steps and and a terminus condition
-        var stepNum = 0;
-        var nextStepNode;
-        for (stepNum = 0 ; stepNum <= localPathNode.steps.length - 1 ; stepNum++) {
-
-            nextStepNode = localPathNode.steps[stepNum];
-            if (nextStepNode.type === "indexStep") {
-
-                $currElement = this.interpretIndexStepNode(nextStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-            }
-            else if (nextStepNode.type === "indirectionStep") {
-
-                $currElement = this.interpretIndirectionStepNode(nextStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist);
-            }
-
-            // Found the content document href referenced by the spine item
-            if ($currElement.is("itemref")) {
-
-                return cfiInstructions.retrieveItemRefHref($currElement, $packageDocument);
-            }
-        }
-
-        return undefined;
-    }
-};
-
-return obj;
-}
-
-
-
-
-
-
-
-
-
-
-if (typeof define == 'function' && typeof define.amd == 'object') {
-    console.log("RequireJS ... cfi_interpreter");
-
-    define('readium_cfi_js/cfi_interpreter',['jquery', 'readium_cfi_js/cfi_parser', './cfi_instructions', './cfi_runtime_errors'],
-    function ($, cfiParser, cfiInstructions, cfiRuntimeErrors) {
-        return init($, cfiParser, cfiInstructions, cfiRuntimeErrors);
-    });
-} else {
-    console.log("!RequireJS ... cfi_interpreter");
-
-    if (!global["EPUBcfi"]) {
-        throw new Error("EPUBcfi not initialised on global object?! (window or this context)");
-    }
-    global.EPUBcfi.Interpreter =
-    init($,
-        global.EPUBcfi.Parser,
-        global.EPUBcfi.CFIInstructions,
-        {
-            NodeTypeError: global.EPUBcfi.NodeTypeError,
-            OutOfRangeError: global.EPUBcfi.OutOfRangeError,
-            TerminusError: global.EPUBcfi.TerminusError,
-            CFIAssertionError: global.EPUBcfi.CFIAssertionError
-        });
-}
-
-})(typeof window !== "undefined" ? window : this);
-
-//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
-//  
-//  Redistribution and use in source and binary forms, with or without modification, 
-//  are permitted provided that the following conditions are met:
-//  1. Redistributions of source code must retain the above copyright notice, this 
-//  list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright notice, 
-//  this list of conditions and the following disclaimer in the documentation and/or 
-//  other materials provided with the distribution.
-//  3. Neither the name of the organization nor the names of its contributors may be 
-//  used to endorse or promote products derived from this software without specific 
-//  prior written permission.
-
-(function(global) {
-
-var init = function($, cfiInstructions, cfiRuntimeErrors) {
-    
-    if (typeof cfiInstructions === "undefined") {
-        throw new Error("UNDEFINED?! cfiInstructions");
-    }
-    
-    if (typeof cfiRuntimeErrors === "undefined") {
-        throw new Error("UNDEFINED?! cfiRuntimeErrors");
-    }
-    
-var obj = {
-
-    // ------------------------------------------------------------------------------------ //
-    //  "PUBLIC" METHODS (THE API)                                                          //
-    // ------------------------------------------------------------------------------------ //
-
-    generateCharOffsetRangeComponent : function (rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist) {
-        var document = rangeStartElement.ownerDocument;
-
-        var docRange;
-        var commonAncestor;
-        var $rangeStartParent;
-        var $rangeEndParent;
-        var range1OffsetStep;
-        var range1CFI;
-        var range2OffsetStep;
-        var range2CFI;
-        var commonCFIComponent;
-
-        this.validateStartTextNode(rangeStartElement);
-        this.validateStartTextNode(rangeEndElement);
-
-        // Parent element is the same
-        if ($(rangeStartElement).parent()[0] === $(rangeEndElement).parent()[0]) {
-            range1OffsetStep = this.createCFITextNodeStep($(rangeStartElement), startOffset, classBlacklist, elementBlacklist, idBlacklist);
-            range2OffsetStep = this.createCFITextNodeStep($(rangeEndElement), endOffset, classBlacklist, elementBlacklist, idBlacklist);          
-            commonCFIComponent = this.createCFIElementSteps($(rangeStartElement).parent(), "html", classBlacklist, elementBlacklist, idBlacklist);
-            return commonCFIComponent.substring(1, commonCFIComponent.length) + "," + range1OffsetStep + "," + range2OffsetStep;
-        }
-        else {
-
-            // Create a document range to find the common ancestor
-            docRange = document.createRange();
-            docRange.setStart(rangeStartElement, startOffset);
-            docRange.setEnd(rangeEndElement, endOffset);
-            commonAncestor = docRange.commonAncestorContainer;
-
-            // Generate terminating offset and range 1
-            range1OffsetStep = this.createCFITextNodeStep($(rangeStartElement), startOffset, classBlacklist, elementBlacklist, idBlacklist);
-            $rangeStartParent = $(rangeStartElement).parent();
-            if ($rangeStartParent[0] === commonAncestor) {
-              // rangeStartElement is a text child node of the commonAncestor, so it's CFI sub-path is only the text node step:
-              range1CFI = range1OffsetStep;
-            } else {
-              range1CFI = this.createCFIElementSteps($rangeStartParent, commonAncestor, classBlacklist, elementBlacklist, idBlacklist) + range1OffsetStep;
-            }
-
-            // Generate terminating offset and range 2
-            range2OffsetStep = this.createCFITextNodeStep($(rangeEndElement), endOffset, classBlacklist, elementBlacklist, idBlacklist);
-            $rangeEndParent = $(rangeEndElement).parent();
-            if ($rangeEndParent[0] === commonAncestor) {
-              // rangeEndElement is a text child node of the commonAncestor, so it's CFI sub-path is only the text node step:
-              range2CFI = range2OffsetStep;
-            } else {
-              range2CFI = this.createCFIElementSteps($rangeEndParent, commonAncestor, classBlacklist, elementBlacklist, idBlacklist) + range2OffsetStep;
-            }
-
-            // Generate shared component
-            commonCFIComponent = this.createCFIElementSteps($(commonAncestor), "html", classBlacklist, elementBlacklist, idBlacklist);
-
-            // Return the result
-            return commonCFIComponent.substring(1, commonCFIComponent.length) + "," + range1CFI + "," + range2CFI;
-        }
-    },
-
-    generateElementRangeComponent : function (rangeStartElement, rangeEndElement, classBlacklist, elementBlacklist, idBlacklist) {
-        var document = rangeStartElement.ownerDocument;
-
-        var docRange;
-        var commonAncestor;
-        var range1CFI;
-        var range2CFI;
-        var commonCFIComponent;
-
-        this.validateStartElement(rangeStartElement);
-        this.validateStartElement(rangeEndElement);
-
-        if (rangeStartElement === rangeEndElement) {
-            throw new Error("Start and end element cannot be the same for a CFI range");
-        }
-
-        // Create a document range to find the common ancestor
-        docRange = document.createRange();
-        docRange.setStart(rangeStartElement, 0);
-        docRange.setEnd(rangeEndElement, rangeEndElement.childNodes.length);
-        commonAncestor = docRange.commonAncestorContainer;
-
-        // Generate range 1
-        range1CFI = this.createCFIElementSteps($(rangeStartElement), commonAncestor, classBlacklist, elementBlacklist, idBlacklist);
-
-        // Generate range 2
-        range2CFI = this.createCFIElementSteps($(rangeEndElement), commonAncestor, classBlacklist, elementBlacklist, idBlacklist);
-
-        // Generate shared component
-        commonCFIComponent = this.createCFIElementSteps($(commonAncestor), "html", classBlacklist, elementBlacklist, idBlacklist);
-
-        // Return the result
-        return commonCFIComponent.substring(1, commonCFIComponent.length) + "," + range1CFI + "," + range2CFI;
-    },
-
-    generateRangeComponent : function (rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist) {
-        var document = rangeStartElement.ownerDocument;
-
-        if(rangeStartElement.nodeType === Node.ELEMENT_NODE && rangeEndElement.nodeType === Node.ELEMENT_NODE){
-            return this.generateElementRangeComponent(rangeStartElement, rangeEndElement, classBlacklist, elementBlacklist, idBlacklist);
-        } else if(rangeStartElement.nodeType === Node.TEXT_NODE && rangeEndElement.nodeType === Node.TEXT_NODE){
-            return this.generateCharOffsetRangeComponent(rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist);
-        } else {
-            var docRange;
-            var range1CFI;
-            var range1OffsetStep;
-            var range2CFI;
-            var range2OffsetStep;
-            var commonAncestor;
-            var commonCFIComponent;
-
-            // Create a document range to find the common ancestor
-            docRange = document.createRange();
-            docRange.setStart(rangeStartElement, startOffset);
-            docRange.setEnd(rangeEndElement, endOffset);
-            commonAncestor = docRange.commonAncestorContainer;
-
-            if(rangeStartElement.nodeType === Node.ELEMENT_NODE){
-                this.validateStartElement(rangeStartElement);
-                range1CFI = this.createCFIElementSteps($(rangeStartElement), commonAncestor, classBlacklist, elementBlacklist, idBlacklist);
-            } else {
-                this.validateStartTextNode(rangeStartElement);
-                // Generate terminating offset and range 1
-                range1OffsetStep = this.createCFITextNodeStep($(rangeStartElement), startOffset, classBlacklist, elementBlacklist, idBlacklist);
-                if($(rangeStartElement).parent().is(commonAncestor)){
-                    range1CFI = range1OffsetStep;
-                } else {
-                    range1CFI = this.createCFIElementSteps($(rangeStartElement).parent(), commonAncestor, classBlacklist, elementBlacklist, idBlacklist) + range1OffsetStep;    
-                }
-            }
-
-            if(rangeEndElement.nodeType === Node.ELEMENT_NODE){
-                this.validateStartElement(rangeEndElement);
-                range2CFI = this.createCFIElementSteps($(rangeEndElement), commonAncestor, classBlacklist, elementBlacklist, idBlacklist);
-            } else {
-                this.validateStartTextNode(rangeEndElement);
-                // Generate terminating offset and range 2
-                range2OffsetStep = this.createCFITextNodeStep($(rangeEndElement), endOffset, classBlacklist, elementBlacklist, idBlacklist);
-                if($(rangeEndElement).parent().is(commonAncestor)){
-                    range2CFI = range2OffsetStep;
-                } else {
-                    range2CFI = this.createCFIElementSteps($(rangeEndElement).parent(), commonAncestor, classBlacklist, elementBlacklist, idBlacklist) + range2OffsetStep;    
-                }                
-            }
-
-            // Generate shared component
-            commonCFIComponent = this.createCFIElementSteps($(commonAncestor), "html", classBlacklist, elementBlacklist, idBlacklist);
-
-            // Return the result
-            return commonCFIComponent.substring(1, commonCFIComponent.length) + "," + range1CFI + "," + range2CFI;
-        }
-    },
-
-    // Description: Generates a character offset CFI 
-    // Arguments: The text node that contains the offset referenced by the cfi, the offset value, the name of the 
-    //   content document that contains the text node, the package document for this EPUB.
-    generateCharacterOffsetCFIComponent : function (startTextNode, characterOffset, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var textNodeStep;
-        var contentDocCFI;
-        var $itemRefStartNode;
-        var packageDocCFI;
-
-        this.validateStartTextNode(startTextNode, characterOffset);
-
-        // Create the text node step
-        textNodeStep = this.createCFITextNodeStep($(startTextNode), characterOffset, classBlacklist, elementBlacklist, idBlacklist);
-
-        // Call the recursive method to create all the steps up to the head element of the content document (the "html" element)
-        contentDocCFI = this.createCFIElementSteps($(startTextNode).parent(), "html", classBlacklist, elementBlacklist, idBlacklist) + textNodeStep;
-        return contentDocCFI.substring(1, contentDocCFI.length);
-    },
-
-    generateElementCFIComponent : function (startElement, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var contentDocCFI;
-        var $itemRefStartNode;
-        var packageDocCFI;
-
-        this.validateStartElement(startElement);
-
-        // Call the recursive method to create all the steps up to the head element of the content document (the "html" element)
-        contentDocCFI = this.createCFIElementSteps($(startElement), "html", classBlacklist, elementBlacklist, idBlacklist);
-
-        // Remove the ! 
-        return contentDocCFI.substring(1, contentDocCFI.length);
-    },
-
-    generatePackageDocumentCFIComponent : function (contentDocumentName, packageDocument, classBlacklist, elementBlacklist, idBlacklist) {
-
-        this.validateContentDocumentName(contentDocumentName);
-        this.validatePackageDocument(packageDocument, contentDocumentName);
-
-        // Get the start node (itemref element) that references the content document
-        $itemRefStartNode = $("itemref[idref='" + contentDocumentName + "']", $(packageDocument));
-
-        // Create the steps up to the top element of the package document (the "package" element)
-        packageDocCFIComponent = this.createCFIElementSteps($itemRefStartNode, "package", classBlacklist, elementBlacklist, idBlacklist);
-
-        // Append an !; this assumes that a CFI content document CFI component will be appended at some point
-        return packageDocCFIComponent + "!";
-    },
-
-    generatePackageDocumentCFIComponentWithSpineIndex : function (spineIndex, packageDocument, classBlacklist, elementBlacklist, idBlacklist) {
-
-        // Get the start node (itemref element) that references the content document
-        $itemRefStartNode = $($("spine", packageDocument).children()[spineIndex]);
-
-        // Create the steps up to the top element of the package document (the "package" element)
-        packageDocCFIComponent = this.createCFIElementSteps($itemRefStartNode, "package", classBlacklist, elementBlacklist, idBlacklist);
-
-        // Append an !; this assumes that a CFI content document CFI component will be appended at some point
-        return packageDocCFIComponent + "!";
-    },
-
-    generateCompleteCFI : function (packageDocumentCFIComponent, contentDocumentCFIComponent) {
-
-        return "epubcfi(" + packageDocumentCFIComponent + contentDocumentCFIComponent + ")";  
-    },
-
-    // ------------------------------------------------------------------------------------ //
-    //  "PRIVATE" HELPERS                                                                   //
-    // ------------------------------------------------------------------------------------ //
-
-    validateStartTextNode : function (startTextNode, characterOffset) {
-        
-        // Check that the text node to start from IS a text node
-        if (!startTextNode) {
-            throw new cfiRuntimeErrors.NodeTypeError(startTextNode, "Cannot generate a character offset from a starting point that is not a text node");
-        } else if (startTextNode.nodeType != 3) {
-            throw new cfiRuntimeErrors.NodeTypeError(startTextNode, "Cannot generate a character offset from a starting point that is not a text node");
-        }
-
-        // Check that the character offset is within a valid range for the text node supplied
-        if (characterOffset < 0) {
-            throw new cfiRuntimeErrors.OutOfRangeError(characterOffset, 0, "Character offset cannot be less than 0");
-        }
-        else if (characterOffset > startTextNode.nodeValue.length) {
-            throw new cfiRuntimeErrors.OutOfRangeError(characterOffset, startTextNode.nodeValue.length - 1, "character offset cannot be greater than the length of the text node");
-        }
-    },
-
-    validateStartElement : function (startElement) {
-
-        if (!startElement) {
-            throw new cfiRuntimeErrors.NodeTypeError(startElement, "CFI target element is undefined");
-        }
-
-        if (!(startElement.nodeType && startElement.nodeType === 1)) {
-            throw new cfiRuntimeErrors.NodeTypeError(startElement, "CFI target element is not an HTML element");
-        }
-    },
-
-    validateContentDocumentName : function (contentDocumentName) {
-
-        // Check that the idref for the content document has been provided
-        if (!contentDocumentName) {
-            throw new Error("The idref for the content document, as found in the spine, must be supplied");
-        }
-    },
-
-    validatePackageDocument : function (packageDocument, contentDocumentName) {
-        
-        // Check that the package document is non-empty and contains an itemref element for the supplied idref
-        if (!packageDocument) {
-            throw new Error("A package document must be supplied to generate a CFI");
-        }
-        else if ($($("itemref[idref='" + contentDocumentName + "']", packageDocument)[0]).length === 0) {
-            throw new Error("The idref of the content document could not be found in the spine");
-        }
-    },
-
-    // Description: Creates a CFI terminating step to a text node, with a character offset
-    // REFACTORING CANDIDATE: Some of the parts of this method could be refactored into their own methods
-    createCFITextNodeStep : function ($startTextNode, characterOffset, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var $parentNode;
-        var $contentsExcludingMarkers;
-        var CFIIndex;
-        var indexOfTextNode;
-        var preAssertion;
-        var preAssertionStartIndex;
-        var textLength;
-        var postAssertion;
-        var postAssertionEndIndex;
-
-        // Find text node position in the set of child elements, ignoring any blacklisted elements 
-        $parentNode = $startTextNode.parent();
-        $contentsExcludingMarkers = cfiInstructions.applyBlacklist($parentNode.contents(), classBlacklist, elementBlacklist, idBlacklist);
-
-        // Find the text node index in the parent list, inferring nodes that were originally a single text node
-        var prevNodeWasTextNode;
-        var indexOfFirstInSequence;
-        var textNodeOnlyIndex = 0;
-        var characterOffsetSinceUnsplit = 0;
-        var finalCharacterOffsetInSequence = 0;
-        $.each($contentsExcludingMarkers, 
-            function (index) {
-
-            // If this is a text node, check if it matches and return the current index
-            if (this.nodeType === Node.TEXT_NODE || !prevNodeWasTextNode) {
-
-                if (this.nodeType === Node.TEXT_NODE) {
-                    if (this === $startTextNode[0]) {
-
-                        // Set index as the first in the adjacent sequence of text nodes, or as the index of the current node if this 
-                        //   node is a standard one sandwiched between two element nodes. 
-                        if (prevNodeWasTextNode) {
-                            indexOfTextNode = indexOfFirstInSequence;
-                            finalCharacterOffsetInSequence = characterOffsetSinceUnsplit;
-                        } else {
-                            indexOfTextNode = textNodeOnlyIndex;
-                        }
-                        
-                        // Break out of .each loop
-                        return false; 
-                    }
-
-                    // Save this index as the first in sequence of adjacent text nodes, if it is not already set by this point
-                    prevNodeWasTextNode = true;
-                    characterOffsetSinceUnsplit = characterOffsetSinceUnsplit + this.length;
-                    if (indexOfFirstInSequence === undefined) {
-                        indexOfFirstInSequence = textNodeOnlyIndex;
-                        textNodeOnlyIndex = textNodeOnlyIndex + 1;
-                    }
-                } else if (this.nodeType === Node.ELEMENT_NODE) {
-                    textNodeOnlyIndex = textNodeOnlyIndex + 1;
-                } else if (this.nodeType === Node.COMMENT_NODE) {
-                    prevNodeWasTextNode = true;
-                    characterOffsetSinceUnsplit = characterOffsetSinceUnsplit + this.length + 7; // 7 is the size of the html comment tag <!--[comment]-->
-                    if (indexOfFirstInSequence === undefined) {
-                        indexOfFirstInSequence = textNodeOnlyIndex;
-                    }
-                } else if (this.nodeType === Node.PROCESSING_INSTRUCTION_NODE) {
-                    prevNodeWasTextNode = true;
-                    characterOffsetSinceUnsplit = characterOffsetSinceUnsplit + this.data.length + this.target.length + 5; // 5 is the size of the instruction processing tag including the required space between the target and the data <?[target] [data]?>
-                    if (indexOfFirstInSequence === undefined) {
-                        indexOfFirstInSequence = textNodeOnlyIndex;
-                    }
-                }
-            }
-            // This node is not a text node
-            else if (this.nodeType === Node.ELEMENT_NODE) {
-                prevNodeWasTextNode = false;
-                indexOfFirstInSequence = undefined;
-                characterOffsetSinceUnsplit  = 0;
-            } else if (this.nodeType === Node.COMMENT_NODE) {
-                characterOffsetSinceUnsplit = characterOffsetSinceUnsplit + this.length + 7; // <!--[comment]-->
-            } else if (this.nodeType === Node.PROCESSING_INSTRUCTION_NODE) {
-                characterOffsetSinceUnsplit = characterOffsetSinceUnsplit + this.data.length + this.target.length + 5; // <?[target] [data]?>
-            }
-        });
-
-        // Convert the text node index to a CFI odd-integer representation
-        CFIIndex = (indexOfTextNode * 2) + 1;
-
-        // TODO: text assertions are not in the grammar yet, I think, or they're just causing problems. This has
-        //   been temporarily removed. 
-
-        // Add pre- and post- text assertions
-        // preAssertionStartIndex = (characterOffset - 3 >= 0) ? characterOffset - 3 : 0;
-        // preAssertion = $startTextNode[0].nodeValue.substring(preAssertionStartIndex, characterOffset);
-
-        // textLength = $startTextNode[0].nodeValue.length;
-        // postAssertionEndIndex = (characterOffset + 3 <= textLength) ? characterOffset + 3 : textLength;
-        // postAssertion = $startTextNode[0].nodeValue.substring(characterOffset, postAssertionEndIndex);
-
-        // Gotta infer the correct character offset, as well
-
-        // Return the constructed CFI text node step
-        return "/" + CFIIndex + ":" + (finalCharacterOffsetInSequence + characterOffset);
-         // + "[" + preAssertion + "," + postAssertion + "]";
-    },
-
-    createCFIElementSteps : function ($currNode, topLevelElement, classBlacklist, elementBlacklist, idBlacklist) {
-
-        var $blacklistExcluded;
-        var $parentNode;
-        var currNodePosition;
-        var CFIPosition;
-        var idAssertion;
-        var elementStep; 
-
-
-
-        // per https://github.com/readium/readium-cfi-js/issues/28
-        // if the currentNode is the same as top level element, we're looking at a text node 
-        // that's a direct child of "topLevelElement" so we don't need to include it in the element step.
-        if ($currNode[0] === topLevelElement) {
-            return "";
-        }
-
-        // Find position of current node in parent list
-        $blacklistExcluded = cfiInstructions.applyBlacklist($currNode.parent().children(), classBlacklist, elementBlacklist, idBlacklist);
-        $.each($blacklistExcluded, 
-            function (index, value) {
-
-                if (this === $currNode[0]) {
-
-                    currNodePosition = index;
-
-                    // Break loop
-                    return false;
-                }
-        });
-
-        // Convert position to the CFI even-integer representation
-        CFIPosition = (currNodePosition + 1) * 2;
-
-        // Create CFI step with id assertion, if the element has an id
-        if ($currNode.attr("id")) {
-            elementStep = "/" + CFIPosition + "[" + $currNode.attr("id") + "]";
-        }
-        else {
-            elementStep = "/" + CFIPosition;
-        }
-
-        // If a parent is an html element return the (last) step for this content document, otherwise, continue.
-        //   Also need to check if the current node is the top-level element. This can occur if the start node is also the
-        //   top level element.
-        $parentNode = $currNode.parent();
-        if ($parentNode.is(topLevelElement) || $currNode.is(topLevelElement)) {
-            
-            // If the top level node is a type from which an indirection step, add an indirection step character (!)
-            // REFACTORING CANDIDATE: It is possible that this should be changed to: if (topLevelElement = 'package') do
-            //   not return an indirection character. Every other type of top-level element may require an indirection
-            //   step to navigate to, thus requiring that ! is always prepended. 
-            if (topLevelElement === 'html') {
-                return "!" + elementStep;
-            }
-            else {
-                return elementStep;
-            }
-        }
-        else {
-            return this.createCFIElementSteps($parentNode, topLevelElement, classBlacklist, elementBlacklist, idBlacklist) + elementStep;
-        }
-    }
-};
-
-return obj;
-}
-
-
-
-
-
-
-
-if (typeof define == 'function' && typeof define.amd == 'object') {
-    console.log("RequireJS ... cfi_generator");
-    
-    define('readium_cfi_js/cfi_generator',['jquery', './cfi_instructions', './cfi_runtime_errors'],
-    function ($, cfiInstructions, cfiRuntimeErrors) {
-        return init($, cfiInstructions, cfiRuntimeErrors);
-    });
-} else {
-    console.log("!RequireJS ... cfi_generator");
-    
-    if (!global["EPUBcfi"]) {
-        throw new Error("EPUBcfi not initialised on global object?! (window or this context)");
-    }
-    global.EPUBcfi.Generator = 
-    init($,
-        global.EPUBcfi.CFIInstructions,
-        {
-            NodeTypeError: global.EPUBcfi.NodeTypeError,
-            OutOfRangeError: global.EPUBcfi.OutOfRangeError,
-            TerminusError: global.EPUBcfi.TerminusError,
-            CFIAssertionError: global.EPUBcfi.CFIAssertionError
-        });
-}
-
-})(typeof window !== "undefined" ? window : this);
-
-//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
-//
-//  Redistribution and use in source and binary forms, with or without modification,
-//  are permitted provided that the following conditions are met:
-//  1. Redistributions of source code must retain the above copyright notice, this
-//  list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright notice,
-//  this list of conditions and the following disclaimer in the documentation and/or
-//  other materials provided with the distribution.
-//  3. Neither the name of the organization nor the names of its contributors may be
-//  used to endorse or promote products derived from this software without specific
-//  prior written permission.
-
-(function(global) {
-
-var init = function(cfiParser, cfiInterpreter, cfiInstructions, cfiRuntimeErrors, cfiGenerator) {
-
-    if (typeof cfiParser === "undefined") {
-        throw new Error("UNDEFINED?! cfiParser");
-    }
-
-    if (typeof cfiInterpreter === "undefined") {
-        throw new Error("UNDEFINED?! cfiInterpreter");
-    }
-
-    if (typeof cfiInstructions === "undefined") {
-        throw new Error("UNDEFINED?! cfiInstructions");
-    }
-
-    if (typeof cfiRuntimeErrors === "undefined") {
-        throw new Error("UNDEFINED?! cfiRuntimeErrors");
-    }
-
-    if (typeof cfiGenerator === "undefined") {
-        throw new Error("UNDEFINED?! cfiGenerator");
-    }
-
-    var obj = {
-
-        getContentDocHref : function (CFI, packageDocument) {
-            return cfiInterpreter.getContentDocHref(CFI, packageDocument);
-        },
-        injectElement : function (CFI, contentDocument, elementToInject, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiInterpreter.injectElement(CFI, contentDocument, elementToInject, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        getTargetElement : function (CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiInterpreter.getTargetElement(CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        getTargetElementWithPartialCFI : function (contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiInterpreter.getTargetElementWithPartialCFI(contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        injectRangeElements : function (rangeCFI, contentDocument, startElementToInject, endElementToInject, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiInterpreter.injectRangeElements(rangeCFI, contentDocument, startElementToInject, endElementToInject, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        getRangeTargetElements : function (rangeCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiInterpreter.getRangeTargetElements(rangeCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        isRangeCfi : function (cfi) {
-            return cfiInterpreter.isRangeCfi(cfi);
-        },
-        hasTextTerminus: function(cfi) {
-            return cfiInterpreter.hasTextTerminus(cfi);
-        },
-        getTextTerminusInfo : function (CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiInterpreter.getTextTerminusInfo(CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        getTextTerminusInfoWithPartialCFI : function (contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiInterpreter.getTextTerminusInfoWithPartialCFI(contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        generateCharacterOffsetCFIComponent : function (startTextNode, characterOffset, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiGenerator.generateCharacterOffsetCFIComponent(startTextNode, characterOffset, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        generateElementCFIComponent : function (startElement, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiGenerator.generateElementCFIComponent(startElement, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        generatePackageDocumentCFIComponent : function (contentDocumentName, packageDocument, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiGenerator.generatePackageDocumentCFIComponent(contentDocumentName, packageDocument, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        generatePackageDocumentCFIComponentWithSpineIndex : function (spineIndex, packageDocument, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiGenerator.generatePackageDocumentCFIComponentWithSpineIndex(spineIndex, packageDocument, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        generateCompleteCFI : function (packageDocumentCFIComponent, contentDocumentCFIComponent) {
-            return cfiGenerator.generateCompleteCFI(packageDocumentCFIComponent, contentDocumentCFIComponent);
-        },
-        generateCharOffsetRangeComponent : function (rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiGenerator.generateCharOffsetRangeComponent(rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        generateElementRangeComponent : function (rangeStartElement, rangeEndElement, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiGenerator.generateElementRangeComponent(rangeStartElement, rangeEndElement, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        generateRangeComponent : function (rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist) {
-            return cfiGenerator.generateRangeComponent(rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist);
-        },
-        injectElementAtOffset : function ($textNodeList, textOffset, elementToInject) {
-            return cfiInstructions.injectCFIMarkerIntoText($textNodeList, textOffset, elementToInject);
-        }
-    };
-
-
-    // TODO: remove global (should not be necessary in properly-configured RequireJS build!)
-    // ...but we leave it here as a "legacy" mechanism to access the CFI lib functionality
-    // -----
-    obj.CFIInstructions = cfiInstructions;
-    obj.Parser = cfiParser;
-    obj.Interpreter = cfiInterpreter;
-    obj.Generator = cfiGenerator;
-
-    obj.NodeTypeError= cfiRuntimeErrors.NodeTypeError;
-    obj.OutOfRangeError = cfiRuntimeErrors.OutOfRangeError;
-    obj.TerminusError = cfiRuntimeErrors.TerminusError;
-    obj.CFIAssertionError = cfiRuntimeErrors.CFIAssertionError;
-
-    global.EPUBcfi = obj;
-    // -----
-
-    console.log("#######################################");
-    // console.log(global.EPUBcfi);
-    // console.log("#######################################");
-
-    return obj;
-}
-
-
-
-
-
-
-if (typeof define == 'function' && typeof define.amd == 'object') {
-    console.log("RequireJS ... cfi_API");
-
-    define('readium_cfi_js/cfi_API',['readium_cfi_js/cfi_parser', './cfi_interpreter', './cfi_instructions', './cfi_runtime_errors', './cfi_generator'],
-    function (cfiParser, cfiInterpreter, cfiInstructions, cfiRuntimeErrors, cfiGenerator) {
-
-        return init(cfiParser, cfiInterpreter, cfiInstructions, cfiRuntimeErrors, cfiGenerator);
-    });
-} else {
-    console.log("!RequireJS ... cfi_API");
-
-    if (!global["EPUBcfi"]) {
-        throw new Error("EPUBcfi not initialised on global object?! (window or this context)");
-    }
-
-    init(global.EPUBcfi.Parser,
-        global.EPUBcfi.Interpreter,
-        global.EPUBcfi.CFIInstructions,
-        {
-            NodeTypeError: global.EPUBcfi.NodeTypeError,
-            OutOfRangeError: global.EPUBcfi.OutOfRangeError,
-            TerminusError: global.EPUBcfi.TerminusError,
-            CFIAssertionError: global.EPUBcfi.CFIAssertionError
-        },
-        global.EPUBcfi.Generator);
-}
-
-})(typeof window !== "undefined" ? window : this);
-
-define('readium_cfi_js', ['readium_cfi_js/cfi_API'], function (main) { return main; });
-
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -14989,6 +13344,1643 @@ define('readium_cfi_js', ['readium_cfi_js/cfi_API'], function (main) { return ma
   }
 }.call(this));
 
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
+//  
+//  Redistribution and use in source and binary forms, with or without modification, 
+//  are permitted provided that the following conditions are met:
+//  1. Redistributions of source code must retain the above copyright notice, this 
+//  list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice, 
+//  this list of conditions and the following disclaimer in the documentation and/or 
+//  other materials provided with the distribution.
+//  3. Neither the name of the organization nor the names of its contributors may be 
+//  used to endorse or promote products derived from this software without specific 
+//  prior written permission.
+
+(function(global) {
+
+
+// Description: This is a set of runtime errors that the CFI interpreter can throw. 
+// Rationale: These error types extend the basic javascript error object so error things like the stack trace are 
+//   included with the runtime errors. 
+
+// REFACTORING CANDIDATE: This type of error may not be required in the long run. The parser should catch any syntax errors, 
+//   provided it is error-free, and as such, the AST should never really have any node type errors, which are essentially errors
+//   in the structure of the AST. This error should probably be refactored out when the grammar and interpreter are more stable.
+
+var obj = {
+
+NodeTypeError: function (node, message) {
+
+    function NodeTypeError () {
+
+        this.node = node;
+    }
+
+    NodeTypeError.prototype = new Error(message);
+    NodeTypeError.constructor = NodeTypeError;
+
+    return new NodeTypeError();
+},
+
+// REFACTORING CANDIDATE: Might make sense to include some more specifics about the out-of-rangeyness.
+OutOfRangeError: function (targetIndex, maxIndex, message) {
+
+    function OutOfRangeError () {
+
+        this.targetIndex = targetIndex;
+        this.maxIndex = maxIndex;
+    }
+
+    OutOfRangeError.prototype = new Error(message);
+    OutOfRangeError.constructor = OutOfRangeError()
+
+    return new OutOfRangeError();
+},
+
+// REFACTORING CANDIDATE: This is a bit too general to be useful. When I have a better understanding of the type of errors
+//   that can occur with the various terminus conditions, it'll make more sense to revisit this. 
+TerminusError: function (terminusType, terminusCondition, message) {
+
+    function TerminusError () {
+
+        this.terminusType = terminusType;
+        this.terminusCondition = terminusCondition;
+    }
+
+    TerminusError.prototype = new Error(message);
+    TerminusError.constructor = TerminusError();
+
+    return new TerminusError();
+},
+
+CFIAssertionError: function (expectedAssertion, targetElementAssertion, message) {
+
+    function CFIAssertionError () {
+
+        this.expectedAssertion = expectedAssertion;
+        this.targetElementAssertion = targetElementAssertion;
+    }
+
+    CFIAssertionError.prototype = new Error(message);
+    CFIAssertionError.constructor = CFIAssertionError();
+
+    return new CFIAssertionError();
+}
+
+};
+
+
+
+
+
+
+
+
+
+
+if (typeof define == 'function' && typeof define.amd == 'object') {
+    console.log("RequireJS ... cfi_errors");
+    
+    define('readium_cfi_js/cfi_runtime_errors',[],
+    function () {
+        return obj;
+    });
+} else {
+    console.log("!RequireJS ... cfi_errors");
+    
+    if (!global["EPUBcfi"]) {
+        throw new Error("EPUBcfi not initialised on global object?! (window or this context)");
+    }
+    
+    global.EPUBcfi.NodeTypeError = obj.NodeTypeError;
+    global.EPUBcfi.OutOfRangeError = obj.OutOfRangeError;
+    global.EPUBcfi.TerminusError = obj.TerminusError;
+    global.EPUBcfi.CFIAssertionError = obj.CFIAssertionError;
+}
+
+})(typeof window !== "undefined" ? window : this);
+
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
+//  
+//  Redistribution and use in source and binary forms, with or without modification, 
+//  are permitted provided that the following conditions are met:
+//  1. Redistributions of source code must retain the above copyright notice, this 
+//  list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice, 
+//  this list of conditions and the following disclaimer in the documentation and/or 
+//  other materials provided with the distribution.
+//  3. Neither the name of the organization nor the names of its contributors may be 
+//  used to endorse or promote products derived from this software without specific 
+//  prior written permission.
+
+(function(global) {
+
+var init = function($, _, cfiRuntimeErrors) {
+    
+var obj = {
+
+// Description: This model contains the implementation for "instructions" included in the EPUB CFI domain specific language (DSL). 
+//   Lexing and parsing a CFI produces a set of executable instructions for processing a CFI (represented in the AST). 
+//   This object contains a set of functions that implement each of the executable instructions in the AST. 
+
+    // ------------------------------------------------------------------------------------ //
+    //  "PUBLIC" METHODS (THE API)                                                          //
+    // ------------------------------------------------------------------------------------ //
+
+    // Description: Follows a step
+    // Rationale: The use of children() is important here, as this jQuery method returns a tree of xml nodes, EXCLUDING
+    //   CDATA and text nodes. When we index into the set of child elements, we are assuming that text nodes have been 
+    //   excluded.
+    // REFACTORING CANDIDATE: This should be called "followIndexStep"
+    getNextNode : function (CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist) {
+
+        // Find the jquery index for the current node
+        var $targetNode;
+        if (CFIStepValue % 2 == 0) {
+
+            $targetNode = this.elementNodeStep(CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist);
+        }
+        else {
+
+            $targetNode = this.inferTargetTextNode(CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist);
+        }
+
+        return $targetNode;
+    },
+
+    // Description: This instruction executes an indirection step, where a resource is retrieved using a 
+    //   link contained on a attribute of the target element. The attribute that contains the link differs
+    //   depending on the target. 
+    // Note: Iframe indirection will (should) fail if the iframe is not from the same domain as its containing script due to 
+    //   the cross origin security policy
+    followIndirectionStep : function (CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var that = this;
+        var $contentDocument; 
+        var $blacklistExcluded;
+        var $startElement;
+        var $targetNode;
+
+        // TODO: This check must be expanded to all the different types of indirection step
+        // Only expects iframes, at the moment
+        if ($currNode === undefined || !this._matchesLocalNameOrElement($currNode[0], 'iframe')) {
+
+            throw cfiRuntimeErrors.NodeTypeError($currNode, "expected an iframe element");
+        }
+
+        // Check node type; only iframe indirection is handled, at the moment
+        if (this._matchesLocalNameOrElement($currNode[0], 'iframe')) {
+
+            // Get content
+            $contentDocument = $currNode.contents();
+
+            // Go to the first XHTML element, which will be the first child of the top-level document object
+            $blacklistExcluded = this.applyBlacklist($contentDocument.children(), classBlacklist, elementBlacklist, idBlacklist);
+            $startElement = $($blacklistExcluded[0]);
+
+            // Follow an index step
+            $targetNode = this.getNextNode(CFIStepValue, $startElement, classBlacklist, elementBlacklist, idBlacklist);
+
+            // Return that shit!
+            return $targetNode; 
+        }
+
+        // TODO: Other types of indirection
+        // TODO: $targetNode.is("embed")) : src
+        // TODO: ($targetNode.is("object")) : data
+        // TODO: ($targetNode.is("image") || $targetNode.is("xlink:href")) : xlink:href
+    },
+
+    // Description: Injects an element at the specified text node
+    // Arguments: a cfi text termination string, a jquery object to the current node
+    // REFACTORING CANDIDATE: Rename this to indicate that it injects into a text terminus
+    textTermination : function ($currNode, textOffset, elementToInject) {
+
+        var $injectedElement;
+        // Get the first node, this should be a text node
+        if ($currNode === undefined) {
+
+            throw cfiRuntimeErrors.NodeTypeError($currNode, "expected a terminating node, or node list");
+        } 
+        else if ($currNode.length === 0) {
+
+            throw cfiRuntimeErrors.TerminusError("Text", "Text offset:" + textOffset, "no nodes found for termination condition");
+        }
+
+        $injectedElement = this.injectCFIMarkerIntoText($currNode, textOffset, elementToInject);
+        return $injectedElement;
+    },
+
+    // Description: Checks that the id assertion for the node target matches that on 
+    //   the found node. 
+    targetIdMatchesIdAssertion : function ($foundNode, idAssertion) {
+
+        if ($foundNode.attr("id") === idAssertion) {
+
+            return true;
+        }
+        else {
+
+            return false;
+        }
+    },
+
+    // ------------------------------------------------------------------------------------ //
+    //  "PRIVATE" HELPERS                                                                   //
+    // ------------------------------------------------------------------------------------ //
+
+    // Description: Step reference for xml element node. Expected that CFIStepValue is an even integer
+    elementNodeStep : function (CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var $targetNode;
+        var $blacklistExcluded;
+        var numElements;
+        var jqueryTargetNodeIndex = (CFIStepValue / 2) - 1;
+
+        $blacklistExcluded = this.applyBlacklist($currNode.children(), classBlacklist, elementBlacklist, idBlacklist);
+        numElements = $blacklistExcluded.length;
+
+        if (this.indexOutOfRange(jqueryTargetNodeIndex, numElements)) {
+
+            throw cfiRuntimeErrors.OutOfRangeError(jqueryTargetNodeIndex, numElements - 1, "");
+        }
+
+        $targetNode = $($blacklistExcluded[jqueryTargetNodeIndex]);
+        return $targetNode;
+    },
+
+    retrieveItemRefHref : function ($itemRefElement, $packageDocument) {
+
+        return $("#" + $itemRefElement.attr("idref"), $packageDocument).attr("href");
+    },
+
+    indexOutOfRange : function (targetIndex, numChildElements) {
+
+        return (targetIndex > numChildElements - 1) ? true : false;
+    },
+
+    // Rationale: In order to inject an element into a specific position, access to the parent object 
+    //   is required. This is obtained with the jquery parent() method. An alternative would be to 
+    //   pass in the parent with a filtered list containing only children that are part of the target text node.
+    injectCFIMarkerIntoText : function ($textNodeList, textOffset, elementToInject) {
+        var document = $textNodeList[0].ownerDocument;
+
+        var nodeNum;
+        var currNodeLength;
+        var currTextPosition = 0;
+        var nodeOffset;
+        var originalText;
+        var $injectedNode;
+        var $newTextNode;
+        // The iteration counter may be incorrect here (should be $textNodeList.length - 1 ??)
+        for (nodeNum = 0; nodeNum <= $textNodeList.length; nodeNum++) {
+
+            if ($textNodeList[nodeNum].nodeType === Node.TEXT_NODE) {
+
+                currNodeMaxIndex = $textNodeList[nodeNum].nodeValue.length  + currTextPosition;
+                nodeOffset = textOffset - currTextPosition;
+
+                if (currNodeMaxIndex > textOffset) {
+
+                    // This node is going to be split and the components re-inserted
+                    originalText = $textNodeList[nodeNum].nodeValue;    
+
+                    // Before part
+                    $textNodeList[nodeNum].nodeValue = originalText.slice(0, nodeOffset);
+
+                    // Injected element
+                    $injectedNode = $(elementToInject).insertAfter($textNodeList.eq(nodeNum));
+
+                    // After part
+                    $newTextNode = $(document.createTextNode(originalText.slice(nodeOffset, originalText.length)));
+                    $($newTextNode).insertAfter($injectedNode);
+
+                    return $injectedNode;
+                } else if (currNodeMaxIndex == textOffset){
+                    $injectedNode = $(elementToInject).insertAfter($textNodeList.eq(nodeNum));
+                    return $injectedNode;
+                }
+                else {
+                    currTextPosition = currNodeMaxIndex;
+                }
+            } else if($textNodeList[nodeNum].nodeType === Node.COMMENT_NODE){
+                currNodeMaxIndex = $textNodeList[nodeNum].nodeValue.length + 7 + currTextPosition;
+                currTextPosition = currNodeMaxIndex;
+            } else if($textNodeList[nodeNum].nodeType === Node.PROCESSING_INSTRUCTION_NODE){
+                currNodeMaxIndex = $textNodeList[nodeNum].nodeValue.length + $textNodeList[nodeNum].target.length + 5
+                currTextPosition = currNodeMaxIndex;
+            }
+        }
+
+        throw cfiRuntimeErrors.TerminusError("Text", "Text offset:" + textOffset, "The offset exceeded the length of the text");
+    },
+
+    // Rationale: In order to inject an element into a specific position, access to the parent object 
+    //   is required. This is obtained with the jquery parent() method. An alternative would be to 
+    //   pass in the parent with a filtered list containing only children that are part of the target text node.
+
+    // Description: This method finds a target text node and then injects an element into the appropriate node
+    // Rationale: The possibility that cfi marker elements have been injected into a text node at some point previous to 
+    //   this method being called (and thus splitting the original text node into two separate text nodes) necessitates that
+    //   the set of nodes that compromised the original target text node are inferred and returned.
+    // Notes: Passed a current node. This node should have a set of elements under it. This will include at least one text node, 
+    //   element nodes (maybe), or possibly a mix. 
+    // REFACTORING CANDIDATE: This method is pretty long (and confusing). Worth investigating to see if it can be refactored into something clearer.
+    inferTargetTextNode : function (CFIStepValue, $currNode, classBlacklist, elementBlacklist, idBlacklist) {
+        
+        var $elementsWithoutMarkers;
+        var currLogicalTextNodeIndex;
+        var targetLogicalTextNodeIndex;
+        var nodeNum;
+        var $targetTextNodeList;
+        var prevNodeWasTextNode;
+
+        // Remove any cfi marker elements from the set of elements. 
+        // Rationale: A filtering function is used, as simply using a class selector with jquery appears to 
+        //   result in behaviour where text nodes are also filtered out, along with the class element being filtered.
+        $elementsWithoutMarkers = this.applyBlacklist($currNode.contents(), classBlacklist, elementBlacklist, idBlacklist);
+
+        // Convert CFIStepValue to logical index; assumes odd integer for the step value
+        targetLogicalTextNodeIndex = ((parseInt(CFIStepValue) + 1) / 2) - 1;
+
+        // Set text node position counter
+        currLogicalTextNodeIndex = 0;
+        prevNodeWasTextNode = false;
+        $targetTextNodeList = $elementsWithoutMarkers.filter(
+            function () {
+
+                if (currLogicalTextNodeIndex === targetLogicalTextNodeIndex) {
+
+                    // If it's a text node
+                    if (this.nodeType === Node.TEXT_NODE || this.nodeType === Node.COMMENT_NODE || this.nodeType === Node.PROCESSING_INSTRUCTION_NODE) {
+                        prevNodeWasTextNode = true;
+                        return true;
+                    }
+                    // Rationale: The logical text node position is only incremented once a group of text nodes (a single logical
+                    //   text node) has been passed by the loop. 
+                    else if (prevNodeWasTextNode && (this.nodeType !== Node.TEXT_NODE)) {
+                        currLogicalTextNodeIndex++;
+                        prevNodeWasTextNode = false;
+                        return false;
+                    }
+                }
+                // Don't return any elements
+                else {
+
+                    if (this.nodeType === Node.TEXT_NODE || this.nodeType === Node.COMMENT_NODE || this.nodeType === Node.PROCESSING_INSTRUCTION_NODE) {
+                        prevNodeWasTextNode = true;
+                    }else if (!prevNodeWasTextNode && this.nodeType === Node.ELEMENT_NODE){
+                        currLogicalTextNodeIndex++;
+                        prevNodeWasTextNode = true;
+                    }
+                    else if (prevNodeWasTextNode && (this.nodeType !== Node.TEXT_NODE) && (this !== $elementsWithoutMarkers.lastChild)) {
+                        currLogicalTextNodeIndex++;
+                        prevNodeWasTextNode = false;
+                    }
+
+                    return false;
+                }
+            }
+        );
+
+        // The filtering above should have counted the number of "logical" text nodes; this can be used to 
+        // detect out of range errors
+        if ($targetTextNodeList.length === 0) {
+            throw cfiRuntimeErrors.OutOfRangeError(targetLogicalTextNodeIndex, currLogicalTextNodeIndex, "Index out of range");
+        }
+
+        // return the text node list
+        return $targetTextNodeList;
+    },
+
+    applyBlacklist : function ($elements, classBlacklist, elementBlacklist, idBlacklist) {
+        var self = this;
+        var $filteredElements;
+
+        $filteredElements = $elements.filter(
+            function () {
+
+                var element = this;
+
+                if (classBlacklist && classBlacklist.length) {
+                    var classList = self._getClassNameArray(element);
+                    if (classList.length === 1 && _.contains(classBlacklist, classList[0])) {
+                        return false;
+                    } else if (classList.length && _.intersection(classBlacklist, classList).length) {
+                        return false;
+                    }
+                }
+
+                if (elementBlacklist && elementBlacklist.length) {
+                    if (element.tagName) {
+                        var isElementBlacklisted = _.find(elementBlacklist, function (blacklistedTag) {
+                            blacklistedTag = blacklistedTag.toLowerCase();
+                            return self._matchesLocalNameOrElement(element, blacklistedTag)
+                        });
+                        if (isElementBlacklisted) {
+                            return false;
+                        }
+                    }
+                }
+
+                if (idBlacklist && idBlacklist.length) {
+                    var id = element.id;
+                    if (id && id.length && _.contains(idBlacklist, id)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+        );
+
+        return $filteredElements;
+    },
+
+    _matchesLocalNameOrElement: function (element, otherNameOrElement) {
+        if (typeof otherNameOrElement === 'string') {
+            return (element.localName || element.nodeName) === otherNameOrElement;
+        } else {
+            return element === otherNameOrElement;
+        }
+    },
+
+    _getClassNameArray: function (element) {
+        var className = element.className;
+        if (typeof className === 'string') {
+            return className.split(/\s/);
+        } else if (typeof className === 'object' && 'baseVal' in className) {
+            return className.baseVal.split(/\s/);
+        } else {
+            return [];
+        }
+    }
+};
+
+return obj;
+}
+
+
+
+
+
+
+
+
+
+
+if (typeof define == 'function' && typeof define.amd == 'object') {
+    console.log("RequireJS ... cfi_instructions");
+    
+    define('readium_cfi_js/cfi_instructions',['jquery', 'underscore', './cfi_runtime_errors'],
+    function ($, _, cfiRuntimeErrors) {
+        return init($, _, cfiRuntimeErrors);
+    });
+} else {
+    console.log("!RequireJS ... cfi_instructions");
+    
+    if (!global["EPUBcfi"]) {
+        throw new Error("EPUBcfi not initialised on global object?! (window or this context)");
+    }
+    global.EPUBcfi.CFIInstructions = 
+    init($, _,
+        {
+            NodeTypeError: global.EPUBcfi.NodeTypeError,
+            OutOfRangeError: global.EPUBcfi.OutOfRangeError,
+            TerminusError: global.EPUBcfi.TerminusError,
+            CFIAssertionError: global.EPUBcfi.CFIAssertionError
+        });
+}
+
+})(typeof window !== "undefined" ? window : this);
+
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//  1. Redistributions of source code must retain the above copyright notice, this
+//  list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//  this list of conditions and the following disclaimer in the documentation and/or
+//  other materials provided with the distribution.
+//  3. Neither the name of the organization nor the names of its contributors may be
+//  used to endorse or promote products derived from this software without specific
+//  prior written permission.
+
+(function(global) {
+
+var init = function($, cfiParser, cfiInstructions, cfiRuntimeErrors) {
+
+    if (typeof cfiParser === "undefined") {
+        throw new Error("UNDEFINED?! cfiParser");
+    }
+
+    if (typeof cfiInstructions === "undefined") {
+        throw new Error("UNDEFINED?! cfiInstructions");
+    }
+
+    if (typeof cfiRuntimeErrors === "undefined") {
+        throw new Error("UNDEFINED?! cfiRuntimeErrors");
+    }
+
+var obj = {
+
+// Description: This is an interpreter that inteprets an Abstract Syntax Tree (AST) for a CFI. The result of executing the interpreter
+//   is to inject an element, or set of elements, into an EPUB content document (which is just an XHTML document). These element(s) will
+//   represent the position or area in the EPUB referenced by a CFI.
+// Rationale: The AST is a clean and readable expression of the step-terminus structure of a CFI. Although building an interpreter adds to the
+//   CFI infrastructure, it provides a number of benefits. First, it emphasizes a clear separation of concerns between lexing/parsing a
+//   CFI, which involves some complexity related to escaped and special characters, and the execution of the underlying set of steps
+//   represented by the CFI. Second, it will be easier to extend the interpreter to account for new/altered CFI steps (say for references
+//   to vector objects or multiple CFIs) than if lexing, parsing and interpretation were all handled in a single step. Finally, Readium's objective is
+//   to demonstrate implementation of the EPUB 3.0 spec. An implementation with a strong separation of concerns that conforms to
+//   well-understood patterns for DSL processing should be easier to communicate, analyze and understand.
+// REFACTORING CANDIDATE: node type errors shouldn't really be possible if the CFI syntax is correct and the parser is error free.
+//   Might want to make the script die in those instances, once the grammar and interpreter are more stable.
+// REFACTORING CANDIDATE: The use of the 'nodeType' property is confusing as this is a DOM node property and the two are unrelated.
+//   Whoops. There shouldn't be any interference, however, I think this should be changed.
+
+    // ------------------------------------------------------------------------------------ //
+    //  "PUBLIC" METHODS (THE API)                                                          //
+    // ------------------------------------------------------------------------------------ //
+
+    // Description: Find the content document referenced by the spine item. This should be the spine item
+    //   referenced by the first indirection step in the CFI.
+    // Rationale: This method is a part of the API so that the reading system can "interact" the content document
+    //   pointed to by a CFI. If this is not a separate step, the processing of the CFI must be tightly coupled with
+    //   the reading system, as it stands now.
+    getContentDocHref : function (CFI, packageDocument, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var $packageDocument = $(packageDocument);
+        var decodedCFI = decodeURI(CFI);
+        var CFIAST = cfiParser.parse(decodedCFI);
+
+        if (!CFIAST || CFIAST.type !== "CFIAST") {
+            throw cfiRuntimeErrors.NodeTypeError(CFIAST, "expected CFI AST root node");
+        }
+
+        // Interpet the path node (the package document step)
+        var $packageElement = $($("package", $packageDocument)[0]);
+        var $currElement = this.interpretIndexStepNode(CFIAST.cfiString.path, $packageElement, classBlacklist, elementBlacklist, idBlacklist);
+        foundHref = this.searchLocalPathForHref($currElement, $packageDocument, CFIAST.cfiString.localPath, classBlacklist, elementBlacklist, idBlacklist);
+
+        if (foundHref) {
+            return foundHref;
+        }
+        else {
+            return undefined;
+        }
+    },
+
+    // Description: Inject an arbitrary html element into a position in a content document referenced by a CFI
+    injectElement : function (CFI, contentDocument, elementToInject, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var decodedCFI = decodeURI(CFI);
+        var CFIAST = cfiParser.parse(decodedCFI);
+        var indirectionNode;
+        var indirectionStepNum;
+        var $currElement;
+
+        // Rationale: Since the correct content document for this CFI is already being passed, we can skip to the beginning
+        //   of the indirection step that referenced the content document.
+        // Note: This assumes that indirection steps and index steps conform to an interface: an object with stepLength, idAssertion
+        indirectionStepNum = this.getFirstIndirectionStepNum(CFIAST);
+        indirectionNode = CFIAST.cfiString.localPath.steps[indirectionStepNum];
+        indirectionNode.type = "indexStep";
+
+        // Interpret the rest of the steps
+        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, indirectionStepNum, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
+
+        // TODO: detect what kind of terminus; for now, text node termini are the only kind implemented
+        $currElement = this.interpretTextTerminusNode(CFIAST.cfiString.localPath.termStep, $currElement, elementToInject);
+
+        // Return the element that was injected into
+        return $currElement;
+    },
+
+    // Description: Inject an arbitrary html element into a position in a content document referenced by a CFI
+    injectRangeElements : function (rangeCFI, contentDocument, startElementToInject, endElementToInject, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var decodedCFI = decodeURI(rangeCFI);
+        var CFIAST = cfiParser.parse(decodedCFI);
+        var indirectionNode;
+        var indirectionStepNum;
+        var $currElement;
+        var $range1TargetElement;
+        var $range2TargetElement;
+
+        // Rationale: Since the correct content document for this CFI is already being passed, we can skip to the beginning
+        //   of the indirection step that referenced the content document.
+        // Note: This assumes that indirection steps and index steps conform to an interface: an object with stepLength, idAssertion
+        indirectionStepNum = this.getFirstIndirectionStepNum(CFIAST);
+        indirectionNode = CFIAST.cfiString.localPath.steps[indirectionStepNum];
+        indirectionNode.type = "indexStep";
+
+        // Interpret the rest of the steps in the first local path
+        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, indirectionStepNum, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
+
+        // Interpret the first range local_path
+        $range1TargetElement = this.interpretLocalPath(CFIAST.cfiString.range1, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+        $range1TargetElement = this.interpretTextTerminusNode(CFIAST.cfiString.range1.termStep, $range1TargetElement, startElementToInject);
+
+        // Interpret the second range local_path
+        $range2TargetElement = this.interpretLocalPath(CFIAST.cfiString.range2, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+        $range2TargetElement = this.interpretTextTerminusNode(CFIAST.cfiString.range2.termStep, $range2TargetElement, endElementToInject);
+
+        // Return the element that was injected into
+        return {
+            startElement : $range1TargetElement[0],
+            endElement : $range2TargetElement[0]
+        };
+    },
+
+    // Description: This method will return the element or node (say, a text node) that is the final target of the
+    //   the CFI.
+    getTargetElement : function (CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var decodedCFI = decodeURI(CFI);
+        var CFIAST = cfiParser.parse(decodedCFI);
+        var indirectionNode;
+        var indirectionStepNum;
+        var $currElement;
+
+        // Rationale: Since the correct content document for this CFI is already being passed, we can skip to the beginning
+        //   of the indirection step that referenced the content document.
+        // Note: This assumes that indirection steps and index steps conform to an interface: an object with stepLength, idAssertion
+        indirectionStepNum = this.getFirstIndirectionStepNum(CFIAST);
+        indirectionNode = CFIAST.cfiString.localPath.steps[indirectionStepNum];
+        indirectionNode.type = "indexStep";
+
+        // Interpret the rest of the steps
+        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, indirectionStepNum, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
+
+        // Return the element at the end of the CFI
+        return $currElement;
+    },
+
+    // Description: This method will return the start and end elements (along with their char offsets) that are the final targets of the range CFI.
+    getRangeTargetElements : function (rangeCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var decodedCFI = decodeURI(rangeCFI);
+        var CFIAST = cfiParser.parse(decodedCFI);
+        var indirectionNode;
+        var indirectionStepNum;
+        var $currElement;
+        var $range1TargetElement;
+        var $range2TargetElement;
+
+        // Rationale: Since the correct content document for this CFI is already being passed, we can skip to the beginning
+        //   of the indirection step that referenced the content document.
+        // Note: This assumes that indirection steps and index steps conform to an interface: an object with stepLength, idAssertion
+        indirectionStepNum = this.getFirstIndirectionStepNum(CFIAST);
+        indirectionNode = CFIAST.cfiString.localPath.steps[indirectionStepNum];
+        indirectionNode.type = "indexStep";
+
+        // Interpret the rest of the steps
+        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, indirectionStepNum, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
+
+        // Interpret first range local_path
+        $range1TargetElement = this.interpretLocalPath(CFIAST.cfiString.range1, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+
+        // Interpret second range local_path
+        $range2TargetElement = this.interpretLocalPath(CFIAST.cfiString.range2, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+
+        // Get the start and end character offsets
+        var startOffset = parseInt(CFIAST.cfiString.range1.termStep.offsetValue) || undefined;
+        var endOffset = parseInt(CFIAST.cfiString.range2.termStep.offsetValue) || undefined;
+
+        // Return the element (and char offsets) at the end of the CFI
+        return {
+            startElement: $range1TargetElement[0],
+            startOffset: startOffset,
+            endElement: $range2TargetElement[0],
+            endOffset: endOffset
+        };
+    },
+
+    // Description: This method allows a "partial" CFI to be used to reference a target in a content document, without a
+    //   package document CFI component.
+    // Arguments: {
+    //     contentDocumentCFI : This is a partial CFI that represents a path in a content document only. This partial must be
+    //        syntactically valid, even though it references a path starting at the top of a content document (which is a CFI that
+    //        that has no defined meaning in the spec.)
+    //     contentDocument : A DOM representation of the content document to which the partial CFI refers.
+    // }
+    // Rationale: This method exists to meet the requirements of the Readium-SDK and should be used with care
+    getTargetElementWithPartialCFI : function (contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var decodedCFI = decodeURI(contentDocumentCFI);
+        var CFIAST = cfiParser.parse(decodedCFI);
+        var indirectionNode;
+
+        // Interpret the path node
+        var $currElement = this.interpretIndexStepNode(CFIAST.cfiString.path, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
+
+        // Interpret the rest of the steps
+        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+
+        // Return the element at the end of the CFI
+        return $currElement;
+    },
+
+    // Description: This method allows a "partial" CFI to be used, with a content document, to return the text node and offset
+    //    referenced by the partial CFI.
+    // Arguments: {
+    //     contentDocumentCFI : This is a partial CFI that represents a path in a content document only. This partial must be
+    //        syntactically valid, even though it references a path starting at the top of a content document (which is a CFI that
+    //        that has no defined meaning in the spec.)
+    //     contentDocument : A DOM representation of the content document to which the partial CFI refers.
+    // }
+    getTextTerminusInfoWithPartialCFI : function (contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var decodedCFI = decodeURI(contentDocumentCFI);
+        var CFIAST = cfiParser.parse(decodedCFI);
+        var indirectionNode;
+        var textOffset;
+
+        // Interpret the path node
+        var $currElement = this.interpretIndexStepNode(CFIAST.cfiString.path, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
+
+        // Interpret the rest of the steps
+        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, 0, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+
+        // Return the element at the end of the CFI
+        textOffset = parseInt(CFIAST.cfiString.localPath.termStep.offsetValue);
+        return {
+            textNode: $currElement[0],
+            textOffset: textOffset
+        };
+    },
+
+    // Description: This method will return the element or node (say, a text node) that is the final target of the
+    //   the CFI, along with the text terminus offset.
+    getTextTerminusInfo : function (CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var decodedCFI = decodeURI(CFI);
+        var CFIAST = cfiParser.parse(decodedCFI);
+        var indirectionNode;
+        var indirectionStepNum;
+        var $currElement;
+        var textOffset;
+
+        // Rationale: Since the correct content document for this CFI is already being passed, we can skip to the beginning
+        //   of the indirection step that referenced the content document.
+        // Note: This assumes that indirection steps and index steps conform to an interface: an object with stepLength, idAssertion
+        indirectionStepNum = this.getFirstIndirectionStepNum(CFIAST);
+        indirectionNode = CFIAST.cfiString.localPath.steps[indirectionStepNum];
+        indirectionNode.type = "indexStep";
+
+        // Interpret the rest of the steps
+        $currElement = this.interpretLocalPath(CFIAST.cfiString.localPath, indirectionStepNum, $(contentDocument.documentElement, contentDocument), classBlacklist, elementBlacklist, idBlacklist);
+
+        // Return the element at the end of the CFI
+        textOffset = parseInt(CFIAST.cfiString.localPath.termStep.offsetValue);
+        return {
+            textNode: $currElement[0],
+            textOffset: textOffset
+        };
+    },
+
+    // Description: This function will determine if the input "partial" CFI is expressed as a range
+    isRangeCfi: function (cfi) {
+        var CFIAST = cfiParser.parse(cfi);
+        return CFIAST.cfiString.range1 ? true : false;
+    },
+
+    // Description: This function will determine if the input "partial" CFI has a text terminus step
+    hasTextTerminus: function (cfi) {
+        var CFIAST = cfiParser.parse(cfi);
+        return CFIAST.cfiString.localPath.termStep ? true : false;
+    },
+
+    // ------------------------------------------------------------------------------------ //
+    //  "PRIVATE" HELPERS                                                                   //
+    // ------------------------------------------------------------------------------------ //
+
+    getFirstIndirectionStepNum : function (CFIAST) {
+
+        // Find the first indirection step in the local path; follow it like a regular step, as the step in the content document it
+        //   references is already loaded and has been passed to this method
+        var stepNum = 0;
+        for (stepNum; stepNum <= CFIAST.cfiString.localPath.steps.length - 1 ; stepNum++) {
+
+            nextStepNode = CFIAST.cfiString.localPath.steps[stepNum];
+            if (nextStepNode.type === "indirectionStep") {
+                return stepNum;
+            }
+        }
+    },
+
+    // REFACTORING CANDIDATE: cfiString node and start step num could be merged into one argument, by simply passing the
+    //   starting step... probably a good idea, this would make the meaning of this method clearer.
+    interpretLocalPath : function (localPathNode, startStepNum, $currElement, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var stepNum = startStepNum;
+        var nextStepNode;
+        for (stepNum; stepNum <= localPathNode.steps.length - 1 ; stepNum++) {
+
+            nextStepNode = localPathNode.steps[stepNum];
+            if (nextStepNode.type === "indexStep") {
+
+                $currElement = this.interpretIndexStepNode(nextStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+            }
+            else if (nextStepNode.type === "indirectionStep") {
+
+                $currElement = this.interpretIndirectionStepNode(nextStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+            }
+        }
+
+        return $currElement;
+    },
+
+    interpretIndexStepNode : function (indexStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist) {
+
+        // Check node type; throw error if wrong type
+        if (indexStepNode === undefined || indexStepNode.type !== "indexStep") {
+
+            throw cfiRuntimeErrors.NodeTypeError(indexStepNode, "expected index step node");
+        }
+
+        // Index step
+        var $stepTarget = cfiInstructions.getNextNode(indexStepNode.stepLength, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+
+        // Check the id assertion, if it exists
+        if (indexStepNode.idAssertion) {
+
+            if (!cfiInstructions.targetIdMatchesIdAssertion($stepTarget, indexStepNode.idAssertion)) {
+
+                throw cfiRuntimeErrors.CFIAssertionError(indexStepNode.idAssertion, $stepTarget.attr('id'), "Id assertion failed");
+            }
+        }
+
+        return $stepTarget;
+    },
+
+    interpretIndirectionStepNode : function (indirectionStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist) {
+
+        // Check node type; throw error if wrong type
+        if (indirectionStepNode === undefined || indirectionStepNode.type !== "indirectionStep") {
+
+            throw cfiRuntimeErrors.NodeTypeError(indirectionStepNode, "expected indirection step node");
+        }
+
+        // Indirection step
+        var $stepTarget = cfiInstructions.followIndirectionStep(
+            indirectionStepNode.stepLength,
+            $currElement,
+            classBlacklist,
+            elementBlacklist);
+
+        // Check the id assertion, if it exists
+        if (indirectionStepNode.idAssertion) {
+
+            if (!cfiInstructions.targetIdMatchesIdAssertion($stepTarget, indirectionStepNode.idAssertion)) {
+
+                throw cfiRuntimeErrors.CFIAssertionError(indirectionStepNode.idAssertion, $stepTarget.attr('id'), "Id assertion failed");
+            }
+        }
+
+        return $stepTarget;
+    },
+
+    // REFACTORING CANDIDATE: The logic here assumes that a user will always want to use this terminus
+    //   to inject content into the found node. This will not always be the case, and different types of interpretation
+    //   are probably desired.
+    interpretTextTerminusNode : function (terminusNode, $currElement, elementToInject) {
+
+        if (terminusNode === undefined || terminusNode.type !== "textTerminus") {
+
+            throw cfiRuntimeErrors.NodeTypeError(terminusNode, "expected text terminus node");
+        }
+
+        var $injectedElement = cfiInstructions.textTermination(
+            $currElement,
+            terminusNode.offsetValue,
+            elementToInject
+            );
+
+        return $injectedElement;
+    },
+
+    searchLocalPathForHref : function ($currElement, $packageDocument, localPathNode, classBlacklist, elementBlacklist, idBlacklist) {
+
+        // Interpret the first local_path node, which is a set of steps and and a terminus condition
+        var stepNum = 0;
+        var nextStepNode;
+        for (stepNum = 0 ; stepNum <= localPathNode.steps.length - 1 ; stepNum++) {
+
+            nextStepNode = localPathNode.steps[stepNum];
+            if (nextStepNode.type === "indexStep") {
+
+                $currElement = this.interpretIndexStepNode(nextStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+            }
+            else if (nextStepNode.type === "indirectionStep") {
+
+                $currElement = this.interpretIndirectionStepNode(nextStepNode, $currElement, classBlacklist, elementBlacklist, idBlacklist);
+            }
+
+            // Found the content document href referenced by the spine item
+            if (cfiInstructions._matchesLocalNameOrElement($currElement[0], "itemref")) {
+                return cfiInstructions.retrieveItemRefHref($currElement, $packageDocument);
+            }
+        }
+
+        return undefined;
+    }
+};
+
+return obj;
+}
+
+
+
+
+
+
+
+
+
+
+if (typeof define == 'function' && typeof define.amd == 'object') {
+    console.log("RequireJS ... cfi_interpreter");
+
+    define('readium_cfi_js/cfi_interpreter',['jquery', 'readium_cfi_js/cfi_parser', './cfi_instructions', './cfi_runtime_errors'],
+    function ($, cfiParser, cfiInstructions, cfiRuntimeErrors) {
+        return init($, cfiParser, cfiInstructions, cfiRuntimeErrors);
+    });
+} else {
+    console.log("!RequireJS ... cfi_interpreter");
+
+    if (!global["EPUBcfi"]) {
+        throw new Error("EPUBcfi not initialised on global object?! (window or this context)");
+    }
+    global.EPUBcfi.Interpreter =
+    init($,
+        global.EPUBcfi.Parser,
+        global.EPUBcfi.CFIInstructions,
+        {
+            NodeTypeError: global.EPUBcfi.NodeTypeError,
+            OutOfRangeError: global.EPUBcfi.OutOfRangeError,
+            TerminusError: global.EPUBcfi.TerminusError,
+            CFIAssertionError: global.EPUBcfi.CFIAssertionError
+        });
+}
+
+})(typeof window !== "undefined" ? window : this);
+
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
+//  
+//  Redistribution and use in source and binary forms, with or without modification, 
+//  are permitted provided that the following conditions are met:
+//  1. Redistributions of source code must retain the above copyright notice, this 
+//  list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice, 
+//  this list of conditions and the following disclaimer in the documentation and/or 
+//  other materials provided with the distribution.
+//  3. Neither the name of the organization nor the names of its contributors may be 
+//  used to endorse or promote products derived from this software without specific 
+//  prior written permission.
+
+(function(global) {
+
+var init = function($, cfiInstructions, cfiRuntimeErrors) {
+
+    if (typeof cfiInstructions === "undefined") {
+        throw new Error("UNDEFINED?! cfiInstructions");
+    }
+    
+    if (typeof cfiRuntimeErrors === "undefined") {
+        throw new Error("UNDEFINED?! cfiRuntimeErrors");
+    }
+    
+var obj = {
+
+    // ------------------------------------------------------------------------------------ //
+    //  "PUBLIC" METHODS (THE API)                                                          //
+    // ------------------------------------------------------------------------------------ //
+
+    generateCharOffsetRangeComponent : function (rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist) {
+        var document = rangeStartElement.ownerDocument;
+
+        var docRange;
+        var commonAncestor;
+        var $rangeStartParent;
+        var $rangeEndParent;
+        var range1OffsetStep;
+        var range1CFI;
+        var range2OffsetStep;
+        var range2CFI;
+        var commonCFIComponent;
+
+        this.validateStartTextNode(rangeStartElement);
+        this.validateStartTextNode(rangeEndElement);
+
+        // Parent element is the same
+        if ($(rangeStartElement).parent()[0] === $(rangeEndElement).parent()[0]) {
+            range1OffsetStep = this.createCFITextNodeStep($(rangeStartElement), startOffset, classBlacklist, elementBlacklist, idBlacklist);
+            range2OffsetStep = this.createCFITextNodeStep($(rangeEndElement), endOffset, classBlacklist, elementBlacklist, idBlacklist);          
+            commonCFIComponent = this.createCFIElementSteps($(rangeStartElement).parent(), document.documentElement, classBlacklist, elementBlacklist, idBlacklist);
+            return commonCFIComponent + "," + range1OffsetStep + "," + range2OffsetStep;
+        }
+        else {
+
+            // Create a document range to find the common ancestor
+            docRange = document.createRange();
+            docRange.setStart(rangeStartElement, startOffset);
+            docRange.setEnd(rangeEndElement, endOffset);
+            commonAncestor = docRange.commonAncestorContainer;
+
+            // Generate terminating offset and range 1
+            range1OffsetStep = this.createCFITextNodeStep($(rangeStartElement), startOffset, classBlacklist, elementBlacklist, idBlacklist);
+            $rangeStartParent = $(rangeStartElement).parent();
+            if ($rangeStartParent[0] === commonAncestor) {
+              // rangeStartElement is a text child node of the commonAncestor, so it's CFI sub-path is only the text node step:
+              range1CFI = range1OffsetStep;
+            } else {
+              range1CFI = this.createCFIElementSteps($rangeStartParent, commonAncestor, classBlacklist, elementBlacklist, idBlacklist) + range1OffsetStep;
+            }
+
+            // Generate terminating offset and range 2
+            range2OffsetStep = this.createCFITextNodeStep($(rangeEndElement), endOffset, classBlacklist, elementBlacklist, idBlacklist);
+            $rangeEndParent = $(rangeEndElement).parent();
+            if ($rangeEndParent[0] === commonAncestor) {
+              // rangeEndElement is a text child node of the commonAncestor, so it's CFI sub-path is only the text node step:
+              range2CFI = range2OffsetStep;
+            } else {
+              range2CFI = this.createCFIElementSteps($rangeEndParent, commonAncestor, classBlacklist, elementBlacklist, idBlacklist) + range2OffsetStep;
+            }
+
+            // Generate shared component
+            commonCFIComponent = this.createCFIElementSteps($(commonAncestor), document.documentElement, classBlacklist, elementBlacklist, idBlacklist);
+
+            // Return the result
+            return commonCFIComponent + "," + range1CFI + "," + range2CFI;
+        }
+    },
+
+    generateElementRangeComponent : function (rangeStartElement, rangeEndElement, classBlacklist, elementBlacklist, idBlacklist) {
+        var docRange;
+        var commonAncestor;
+        var range1CFI;
+        var range2CFI;
+        var commonCFIComponent;
+
+        this.validateStartElement(rangeStartElement);
+        this.validateStartElement(rangeEndElement);
+
+        var document = rangeStartElement.ownerDocument;
+
+        if (rangeStartElement === rangeEndElement) {
+            throw new Error("Start and end element cannot be the same for a CFI range");
+        }
+
+        // Create a document range to find the common ancestor
+        docRange = document.createRange();
+        docRange.setStart(rangeStartElement, 0);
+        docRange.setEnd(rangeEndElement, rangeEndElement.childNodes.length);
+        commonAncestor = docRange.commonAncestorContainer;
+
+        // Generate range 1
+        range1CFI = this.createCFIElementSteps($(rangeStartElement), commonAncestor, classBlacklist, elementBlacklist, idBlacklist);
+
+        // Generate range 2
+        range2CFI = this.createCFIElementSteps($(rangeEndElement), commonAncestor, classBlacklist, elementBlacklist, idBlacklist);
+
+        // Generate shared component
+        commonCFIComponent = this.createCFIElementSteps($(commonAncestor), document.documentElement, classBlacklist, elementBlacklist, idBlacklist);
+
+        // Return the result
+        return commonCFIComponent + "," + range1CFI + "," + range2CFI;
+    },
+
+    generateRangeComponent : function (rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist) {
+        this.validateTargetElement(rangeStartElement);
+        this.validateTargetElement(rangeEndElement);
+
+        var document = rangeStartElement.ownerDocument;
+
+        if(rangeStartElement.nodeType === Node.ELEMENT_NODE && rangeEndElement.nodeType === Node.ELEMENT_NODE){
+            return this.generateElementRangeComponent(rangeStartElement, rangeEndElement, classBlacklist, elementBlacklist, idBlacklist);
+        } else if(rangeStartElement.nodeType === Node.TEXT_NODE && rangeEndElement.nodeType === Node.TEXT_NODE){
+            return this.generateCharOffsetRangeComponent(rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist);
+        } else {
+            var docRange;
+            var range1CFI;
+            var range1OffsetStep;
+            var range2CFI;
+            var range2OffsetStep;
+            var commonAncestor;
+            var commonCFIComponent;
+
+            // Create a document range to find the common ancestor
+            docRange = document.createRange();
+            docRange.setStart(rangeStartElement, startOffset);
+            docRange.setEnd(rangeEndElement, endOffset);
+            commonAncestor = docRange.commonAncestorContainer;
+
+            if(rangeStartElement.nodeType === Node.ELEMENT_NODE){
+                this.validateStartElement(rangeStartElement);
+                range1CFI = this.createCFIElementSteps($(rangeStartElement), commonAncestor, classBlacklist, elementBlacklist, idBlacklist);
+            } else {
+                this.validateStartTextNode(rangeStartElement);
+                // Generate terminating offset and range 1
+                range1OffsetStep = this.createCFITextNodeStep($(rangeStartElement), startOffset, classBlacklist, elementBlacklist, idBlacklist);
+                if ($(rangeStartElement).parent()[0] === commonAncestor) {
+                    range1CFI = range1OffsetStep;
+                } else {
+                    range1CFI = this.createCFIElementSteps($(rangeStartElement).parent(), commonAncestor, classBlacklist, elementBlacklist, idBlacklist) + range1OffsetStep;    
+                }
+            }
+
+            if(rangeEndElement.nodeType === Node.ELEMENT_NODE){
+                this.validateStartElement(rangeEndElement);
+                range2CFI = this.createCFIElementSteps($(rangeEndElement), commonAncestor, classBlacklist, elementBlacklist, idBlacklist);
+            } else {
+                this.validateStartTextNode(rangeEndElement);
+                // Generate terminating offset and range 2
+                range2OffsetStep = this.createCFITextNodeStep($(rangeEndElement), endOffset, classBlacklist, elementBlacklist, idBlacklist);
+                if ($(rangeEndElement).parent()[0] === commonAncestor) {
+                    range2CFI = range2OffsetStep;
+                } else {
+                    range2CFI = this.createCFIElementSteps($(rangeEndElement).parent(), commonAncestor, classBlacklist, elementBlacklist, idBlacklist) + range2OffsetStep;    
+                }                
+            }
+
+            // Generate shared component
+            commonCFIComponent = this.createCFIElementSteps($(commonAncestor), document.documentElement, classBlacklist, elementBlacklist, idBlacklist);
+
+            // Return the result
+            return commonCFIComponent + "," + range1CFI + "," + range2CFI;
+        }
+    },
+
+    // Description: Generates a character offset CFI 
+    // Arguments: The text node that contains the offset referenced by the cfi, the offset value, the name of the 
+    //   content document that contains the text node, the package document for this EPUB.
+    generateCharacterOffsetCFIComponent : function (startTextNode, characterOffset, classBlacklist, elementBlacklist, idBlacklist) {
+        var textNodeStep;
+        var contentDocCFI;
+        var $itemRefStartNode;
+        var packageDocCFI;
+
+        this.validateStartTextNode(startTextNode, characterOffset);
+
+        // Create the text node step
+        textNodeStep = this.createCFITextNodeStep($(startTextNode), characterOffset, classBlacklist, elementBlacklist, idBlacklist);
+
+        // Call the recursive method to create all the steps up to the head element of the content document (typically the "html" element, or the "svg" element)
+        contentDocCFI = this.createCFIElementSteps($(startTextNode).parent(), startTextNode.ownerDocument.documentElement, classBlacklist, elementBlacklist, idBlacklist) + textNodeStep;
+        return contentDocCFI;
+    },
+
+    generateElementCFIComponent : function (startElement, classBlacklist, elementBlacklist, idBlacklist) {
+        var contentDocCFI;
+        var $itemRefStartNode;
+        var packageDocCFI;
+
+        this.validateStartElement(startElement);
+
+        // Call the recursive method to create all the steps up to the head element of the content document (typically the "html" element, or the "svg" element)
+        contentDocCFI = this.createCFIElementSteps($(startElement), startElement.ownerDocument.documentElement, classBlacklist, elementBlacklist, idBlacklist);
+
+        return contentDocCFI;
+    },
+
+    generatePackageDocumentCFIComponent : function (contentDocumentName, packageDocument, classBlacklist, elementBlacklist, idBlacklist) {
+
+        this.validateContentDocumentName(contentDocumentName);
+        this.validatePackageDocument(packageDocument, contentDocumentName);
+
+        // Get the start node (itemref element) that references the content document
+        $itemRefStartNode = $("itemref[idref='" + contentDocumentName + "']", $(packageDocument));
+
+        // Create the steps up to the top element of the package document (the "package" element)
+        packageDocCFIComponent = this.createCFIElementSteps($itemRefStartNode, "package", classBlacklist, elementBlacklist, idBlacklist);
+
+        // Append an !; this assumes that a CFI content document CFI component will be appended at some point
+        return packageDocCFIComponent + "!";
+    },
+
+    generatePackageDocumentCFIComponentWithSpineIndex : function (spineIndex, packageDocument, classBlacklist, elementBlacklist, idBlacklist) {
+
+        // Get the start node (itemref element) that references the content document
+        $itemRefStartNode = $($("spine", packageDocument).children()[spineIndex]);
+
+        // Create the steps up to the top element of the package document (the "package" element)
+        packageDocCFIComponent = this.createCFIElementSteps($itemRefStartNode, "package", classBlacklist, elementBlacklist, idBlacklist);
+
+        // Append an !; this assumes that a CFI content document CFI component will be appended at some point
+        return packageDocCFIComponent + "!";
+    },
+
+    generateCompleteCFI : function (packageDocumentCFIComponent, contentDocumentCFIComponent) {
+
+        return "epubcfi(" + packageDocumentCFIComponent + contentDocumentCFIComponent + ")";  
+    },
+
+    // ------------------------------------------------------------------------------------ //
+    //  "PRIVATE" HELPERS                                                                   //
+    // ------------------------------------------------------------------------------------ //
+
+    validateStartTextNode : function (startTextNode, characterOffset) {
+        
+        // Check that the text node to start from IS a text node
+        if (!startTextNode) {
+            throw new cfiRuntimeErrors.NodeTypeError(startTextNode, "Cannot generate a character offset from a starting point that is not a text node");
+        } else if (startTextNode.nodeType != 3) {
+            throw new cfiRuntimeErrors.NodeTypeError(startTextNode, "Cannot generate a character offset from a starting point that is not a text node");
+        }
+
+        // Check that the character offset is within a valid range for the text node supplied
+        if (characterOffset < 0) {
+            throw new cfiRuntimeErrors.OutOfRangeError(characterOffset, 0, "Character offset cannot be less than 0");
+        }
+        else if (characterOffset > startTextNode.nodeValue.length) {
+            throw new cfiRuntimeErrors.OutOfRangeError(characterOffset, startTextNode.nodeValue.length - 1, "character offset cannot be greater than the length of the text node");
+        }
+    },
+
+    validateStartElement : function (startElement) {
+
+        this.validateTargetElement(startElement);
+
+        if (!(startElement.nodeType && startElement.nodeType === 1)) {
+            throw new cfiRuntimeErrors.NodeTypeError(startElement, "CFI target element is not an HTML element");
+        }
+    },
+
+    validateTargetElement : function (startElement) {
+
+        if (!startElement) {
+            throw new cfiRuntimeErrors.NodeTypeError(startElement, "CFI target element is undefined");
+        }
+    },
+
+    validateContentDocumentName : function (contentDocumentName) {
+
+        // Check that the idref for the content document has been provided
+        if (!contentDocumentName) {
+            throw new Error("The idref for the content document, as found in the spine, must be supplied");
+        }
+    },
+
+    validatePackageDocument : function (packageDocument, contentDocumentName) {
+        
+        // Check that the package document is non-empty and contains an itemref element for the supplied idref
+        if (!packageDocument) {
+            throw new Error("A package document must be supplied to generate a CFI");
+        }
+        else if ($($("itemref[idref='" + contentDocumentName + "']", packageDocument)[0]).length === 0) {
+            throw new Error("The idref of the content document could not be found in the spine");
+        }
+    },
+
+    // Description: Creates a CFI terminating step to a text node, with a character offset
+    // REFACTORING CANDIDATE: Some of the parts of this method could be refactored into their own methods
+    createCFITextNodeStep : function ($startTextNode, characterOffset, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var $parentNode;
+        var $contentsExcludingMarkers;
+        var CFIIndex;
+        var indexOfTextNode;
+        var preAssertion;
+        var preAssertionStartIndex;
+        var textLength;
+        var postAssertion;
+        var postAssertionEndIndex;
+
+        // Find text node position in the set of child elements, ignoring any blacklisted elements 
+        $parentNode = $startTextNode.parent();
+        $contentsExcludingMarkers = cfiInstructions.applyBlacklist($parentNode.contents(), classBlacklist, elementBlacklist, idBlacklist);
+
+        // Find the text node index in the parent list, inferring nodes that were originally a single text node
+        var prevNodeWasTextNode;
+        var indexOfFirstInSequence;
+        var textNodeOnlyIndex = 0;
+        var characterOffsetSinceUnsplit = 0;
+        var finalCharacterOffsetInSequence = 0;
+        $.each($contentsExcludingMarkers, 
+            function (index) {
+
+            // If this is a text node, check if it matches and return the current index
+            if (this.nodeType === Node.TEXT_NODE || !prevNodeWasTextNode) {
+
+                if (this.nodeType === Node.TEXT_NODE) {
+                    if (this === $startTextNode[0]) {
+
+                        // Set index as the first in the adjacent sequence of text nodes, or as the index of the current node if this 
+                        //   node is a standard one sandwiched between two element nodes. 
+                        if (prevNodeWasTextNode) {
+                            indexOfTextNode = indexOfFirstInSequence;
+                            finalCharacterOffsetInSequence = characterOffsetSinceUnsplit;
+                        } else {
+                            indexOfTextNode = textNodeOnlyIndex;
+                        }
+                        
+                        // Break out of .each loop
+                        return false; 
+                    }
+
+                    // Save this index as the first in sequence of adjacent text nodes, if it is not already set by this point
+                    prevNodeWasTextNode = true;
+                    characterOffsetSinceUnsplit = characterOffsetSinceUnsplit + this.length;
+                    if (indexOfFirstInSequence === undefined) {
+                        indexOfFirstInSequence = textNodeOnlyIndex;
+                        textNodeOnlyIndex = textNodeOnlyIndex + 1;
+                    }
+                } else if (this.nodeType === Node.ELEMENT_NODE) {
+                    textNodeOnlyIndex = textNodeOnlyIndex + 1;
+                } else if (this.nodeType === Node.COMMENT_NODE) {
+                    prevNodeWasTextNode = true;
+                    characterOffsetSinceUnsplit = characterOffsetSinceUnsplit + this.length + 7; // 7 is the size of the html comment tag <!--[comment]-->
+                    if (indexOfFirstInSequence === undefined) {
+                        indexOfFirstInSequence = textNodeOnlyIndex;
+                    }
+                } else if (this.nodeType === Node.PROCESSING_INSTRUCTION_NODE) {
+                    prevNodeWasTextNode = true;
+                    characterOffsetSinceUnsplit = characterOffsetSinceUnsplit + this.data.length + this.target.length + 5; // 5 is the size of the instruction processing tag including the required space between the target and the data <?[target] [data]?>
+                    if (indexOfFirstInSequence === undefined) {
+                        indexOfFirstInSequence = textNodeOnlyIndex;
+                    }
+                }
+            }
+            // This node is not a text node
+            else if (this.nodeType === Node.ELEMENT_NODE) {
+                prevNodeWasTextNode = false;
+                indexOfFirstInSequence = undefined;
+                characterOffsetSinceUnsplit  = 0;
+            } else if (this.nodeType === Node.COMMENT_NODE) {
+                characterOffsetSinceUnsplit = characterOffsetSinceUnsplit + this.length + 7; // <!--[comment]-->
+            } else if (this.nodeType === Node.PROCESSING_INSTRUCTION_NODE) {
+                characterOffsetSinceUnsplit = characterOffsetSinceUnsplit + this.data.length + this.target.length + 5; // <?[target] [data]?>
+            }
+        });
+
+        // Convert the text node index to a CFI odd-integer representation
+        CFIIndex = (indexOfTextNode * 2) + 1;
+
+        // TODO: text assertions are not in the grammar yet, I think, or they're just causing problems. This has
+        //   been temporarily removed. 
+
+        // Add pre- and post- text assertions
+        // preAssertionStartIndex = (characterOffset - 3 >= 0) ? characterOffset - 3 : 0;
+        // preAssertion = $startTextNode[0].nodeValue.substring(preAssertionStartIndex, characterOffset);
+
+        // textLength = $startTextNode[0].nodeValue.length;
+        // postAssertionEndIndex = (characterOffset + 3 <= textLength) ? characterOffset + 3 : textLength;
+        // postAssertion = $startTextNode[0].nodeValue.substring(characterOffset, postAssertionEndIndex);
+
+        // Gotta infer the correct character offset, as well
+
+        // Return the constructed CFI text node step
+        return "/" + CFIIndex + ":" + (finalCharacterOffsetInSequence + characterOffset);
+         // + "[" + preAssertion + "," + postAssertion + "]";
+    },
+
+    createCFIElementSteps : function ($currNode, topLevelElement, classBlacklist, elementBlacklist, idBlacklist) {
+
+        var $blacklistExcluded;
+        var $parentNode;
+        var currNodePosition;
+        var CFIPosition;
+        var idAssertion;
+        var elementStep;
+
+        // Find position of current node in parent list
+        $blacklistExcluded = cfiInstructions.applyBlacklist($currNode.parent().children(), classBlacklist, elementBlacklist, idBlacklist);
+        $.each($blacklistExcluded, 
+            function (index, value) {
+
+                if (this === $currNode[0]) {
+
+                    currNodePosition = index;
+
+                    // Break loop
+                    return false;
+                }
+        });
+
+        // Convert position to the CFI even-integer representation
+        CFIPosition = (currNodePosition + 1) * 2;
+
+        // Create CFI step with id assertion, if the element has an id
+        if ($currNode.attr("id")) {
+            elementStep = "/" + CFIPosition + "[" + $currNode.attr("id") + "]";
+        }
+        else {
+            elementStep = "/" + CFIPosition;
+        }
+
+        // If a parent is an html element return the (last) step for this content document, otherwise, continue.
+        //   Also need to check if the current node is the top-level element. This can occur if the start node is also the
+        //   top level element.
+        $parentNode = $currNode.parent();
+        if (typeof topLevelElement === 'string' &&
+            cfiInstructions._matchesLocalNameOrElement($parentNode[0], topLevelElement) ||
+            cfiInstructions._matchesLocalNameOrElement($currNode[0], topLevelElement)) {
+            return elementStep;
+        } else if ($parentNode[0] === topLevelElement || $currNode[0] === topLevelElement) {
+            return elementStep;
+        } else {
+            return this.createCFIElementSteps($parentNode, topLevelElement, classBlacklist, elementBlacklist, idBlacklist) + elementStep;
+        }
+    }
+};
+
+return obj;
+}
+
+
+
+
+
+
+
+if (typeof define == 'function' && typeof define.amd == 'object') {
+    console.log("RequireJS ... cfi_generator");
+    
+    define('readium_cfi_js/cfi_generator',['jquery', './cfi_instructions', './cfi_runtime_errors'],
+    function ($, cfiInstructions, cfiRuntimeErrors) {
+        return init($, cfiInstructions, cfiRuntimeErrors);
+    });
+} else {
+    console.log("!RequireJS ... cfi_generator");
+    
+    if (!global["EPUBcfi"]) {
+        throw new Error("EPUBcfi not initialised on global object?! (window or this context)");
+    }
+    global.EPUBcfi.Generator = 
+    init($,
+        global.EPUBcfi.CFIInstructions,
+        {
+            NodeTypeError: global.EPUBcfi.NodeTypeError,
+            OutOfRangeError: global.EPUBcfi.OutOfRangeError,
+            TerminusError: global.EPUBcfi.TerminusError,
+            CFIAssertionError: global.EPUBcfi.CFIAssertionError
+        });
+}
+
+})(typeof window !== "undefined" ? window : this);
+
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//  1. Redistributions of source code must retain the above copyright notice, this
+//  list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//  this list of conditions and the following disclaimer in the documentation and/or
+//  other materials provided with the distribution.
+//  3. Neither the name of the organization nor the names of its contributors may be
+//  used to endorse or promote products derived from this software without specific
+//  prior written permission.
+
+(function(global) {
+
+var init = function(cfiParser, cfiInterpreter, cfiInstructions, cfiRuntimeErrors, cfiGenerator) {
+
+    if (typeof cfiParser === "undefined") {
+        throw new Error("UNDEFINED?! cfiParser");
+    }
+
+    if (typeof cfiInterpreter === "undefined") {
+        throw new Error("UNDEFINED?! cfiInterpreter");
+    }
+
+    if (typeof cfiInstructions === "undefined") {
+        throw new Error("UNDEFINED?! cfiInstructions");
+    }
+
+    if (typeof cfiRuntimeErrors === "undefined") {
+        throw new Error("UNDEFINED?! cfiRuntimeErrors");
+    }
+
+    if (typeof cfiGenerator === "undefined") {
+        throw new Error("UNDEFINED?! cfiGenerator");
+    }
+
+    var obj = {
+
+        getContentDocHref : function (CFI, packageDocument) {
+            return cfiInterpreter.getContentDocHref(CFI, packageDocument);
+        },
+        injectElement : function (CFI, contentDocument, elementToInject, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiInterpreter.injectElement(CFI, contentDocument, elementToInject, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        getTargetElement : function (CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiInterpreter.getTargetElement(CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        getTargetElementWithPartialCFI : function (contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiInterpreter.getTargetElementWithPartialCFI(contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        injectRangeElements : function (rangeCFI, contentDocument, startElementToInject, endElementToInject, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiInterpreter.injectRangeElements(rangeCFI, contentDocument, startElementToInject, endElementToInject, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        getRangeTargetElements : function (rangeCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiInterpreter.getRangeTargetElements(rangeCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        isRangeCfi : function (cfi) {
+            return cfiInterpreter.isRangeCfi(cfi);
+        },
+        hasTextTerminus: function(cfi) {
+            return cfiInterpreter.hasTextTerminus(cfi);
+        },
+        getTextTerminusInfo : function (CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiInterpreter.getTextTerminusInfo(CFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        getTextTerminusInfoWithPartialCFI : function (contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiInterpreter.getTextTerminusInfoWithPartialCFI(contentDocumentCFI, contentDocument, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        generateCharacterOffsetCFIComponent : function (startTextNode, characterOffset, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiGenerator.generateCharacterOffsetCFIComponent(startTextNode, characterOffset, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        generateElementCFIComponent : function (startElement, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiGenerator.generateElementCFIComponent(startElement, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        generatePackageDocumentCFIComponent : function (contentDocumentName, packageDocument, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiGenerator.generatePackageDocumentCFIComponent(contentDocumentName, packageDocument, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        generatePackageDocumentCFIComponentWithSpineIndex : function (spineIndex, packageDocument, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiGenerator.generatePackageDocumentCFIComponentWithSpineIndex(spineIndex, packageDocument, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        generateCompleteCFI : function (packageDocumentCFIComponent, contentDocumentCFIComponent) {
+            return cfiGenerator.generateCompleteCFI(packageDocumentCFIComponent, contentDocumentCFIComponent);
+        },
+        generateCharOffsetRangeComponent : function (rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiGenerator.generateCharOffsetRangeComponent(rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        generateElementRangeComponent : function (rangeStartElement, rangeEndElement, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiGenerator.generateElementRangeComponent(rangeStartElement, rangeEndElement, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        generateRangeComponent : function (rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist) {
+            return cfiGenerator.generateRangeComponent(rangeStartElement, startOffset, rangeEndElement, endOffset, classBlacklist, elementBlacklist, idBlacklist);
+        },
+        injectElementAtOffset : function ($textNodeList, textOffset, elementToInject) {
+            return cfiInstructions.injectCFIMarkerIntoText($textNodeList, textOffset, elementToInject);
+        }
+    };
+
+
+    // TODO: remove global (should not be necessary in properly-configured RequireJS build!)
+    // ...but we leave it here as a "legacy" mechanism to access the CFI lib functionality
+    // -----
+    obj.CFIInstructions = cfiInstructions;
+    obj.Parser = cfiParser;
+    obj.Interpreter = cfiInterpreter;
+    obj.Generator = cfiGenerator;
+
+    obj.NodeTypeError= cfiRuntimeErrors.NodeTypeError;
+    obj.OutOfRangeError = cfiRuntimeErrors.OutOfRangeError;
+    obj.TerminusError = cfiRuntimeErrors.TerminusError;
+    obj.CFIAssertionError = cfiRuntimeErrors.CFIAssertionError;
+
+    global.EPUBcfi = obj;
+    // -----
+
+    console.log("#######################################");
+    // console.log(global.EPUBcfi);
+    // console.log("#######################################");
+
+    return obj;
+}
+
+
+
+
+
+
+if (typeof define == 'function' && typeof define.amd == 'object') {
+    console.log("RequireJS ... cfi_API");
+
+    define('readium_cfi_js/cfi_API',['readium_cfi_js/cfi_parser', './cfi_interpreter', './cfi_instructions', './cfi_runtime_errors', './cfi_generator'],
+    function (cfiParser, cfiInterpreter, cfiInstructions, cfiRuntimeErrors, cfiGenerator) {
+
+        return init(cfiParser, cfiInterpreter, cfiInstructions, cfiRuntimeErrors, cfiGenerator);
+    });
+} else {
+    console.log("!RequireJS ... cfi_API");
+
+    if (!global["EPUBcfi"]) {
+        throw new Error("EPUBcfi not initialised on global object?! (window or this context)");
+    }
+
+    init(global.EPUBcfi.Parser,
+        global.EPUBcfi.Interpreter,
+        global.EPUBcfi.CFIInstructions,
+        {
+            NodeTypeError: global.EPUBcfi.NodeTypeError,
+            OutOfRangeError: global.EPUBcfi.OutOfRangeError,
+            TerminusError: global.EPUBcfi.TerminusError,
+            CFIAssertionError: global.EPUBcfi.CFIAssertionError
+        },
+        global.EPUBcfi.Generator);
+}
+
+})(typeof window !== "undefined" ? window : this);
+
+define('readium_cfi_js', ['readium_cfi_js/cfi_API'], function (main) { return main; });
+
 define('eventEmitter',['require','exports','module'],function (require, exports, module) {'use strict';
 
 var has = Object.prototype.hasOwnProperty
@@ -15303,193 +15295,6 @@ if ('undefined' !== typeof module) {
 
 });
 
-//
-//  Created by Juan Corona
-//  Based on original proposal by Mickaël Menu
-//  Portions adapted from Rangy's Module system: Copyright (c) 2014 Tim Down
-//
-//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
-//
-//  Redistribution and use in source and binary forms, with or without modification,
-//  are permitted provided that the following conditions are met:
-//  1. Redistributions of source code must retain the above copyright notice, this
-//  list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright notice,
-//  this list of conditions and the following disclaimer in the documentation and/or
-//  other materials provided with the distribution.
-//  3. Neither the name of the organization nor the names of its contributors may be
-//  used to endorse or promote products derived from this software without specific
-//  prior written permission.
-//
-//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-//  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-//  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-//  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-//  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-//  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
-//  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
-//  OF THE POSSIBILITY OF SUCH DAMAGE.
-
-define('readium_js_plugins',["jquery", "underscore", "eventEmitter"], function ($, _, EventEmitter) {
-
-    var _registeredPlugins = {};
-
-    /**
-     * A  plugins controller used to easily add plugins from the host app, eg.
-     * ReadiumSDK.Plugins.register("footnotes", function(api){ ... });
-     *
-     * @constructor
-     */
-    var PluginsController = function () {
-        var self = this;
-
-
-        this.initialize = function (reader) {
-            var apiFactory = new PluginApiFactory(reader);
-
-            if (!reader.plugins) {
-                //attach an object to the reader that will be
-                // used for plugin namespaces and their extensions
-                reader.plugins = {};
-            } else {
-                throw new Error("Already initialized on reader!");
-            }
-            _.each(_registeredPlugins, function (plugin) {
-                plugin.init(apiFactory);
-            });
-        };
-
-        this.getLoadedPlugins = function() {
-            return _registeredPlugins;
-        };
-
-        // Creates a new instance of the given plugin constructor.
-        this.register = function (name, optDependencies, initFunc) {
-
-            if (_registeredPlugins[name]) {
-                throw new Error("Duplicate registration for plugin with name: " + name);
-            }
-
-            var dependencies;
-            if (typeof optDependencies === 'function') {
-                initFunc = optDependencies;
-            } else {
-                dependencies = optDependencies;
-            }
-
-            _registeredPlugins[name] = new Plugin(name, dependencies, function(plugin, api) {
-                if (!plugin.initialized || !api.host.plugins[plugin.name]) {
-                    plugin.initialized = true;
-                    try {
-                        var pluginContext = {};
-                        $.extend(pluginContext, new EventEmitter());
-
-                        initFunc.call(pluginContext, api.instance);
-                        plugin.supported = true;
-
-                        api.host.plugins[plugin.name] = pluginContext;
-                    } catch (ex) {
-                        plugin.fail(ex);
-                    }
-                }
-            });
-        };
-    };
-
-    function PluginApi(reader, plugin) {
-        this.reader = reader;
-        this.plugin = plugin;
-    }
-
-    function PluginApiFactory(reader) {
-        this.create = function (plugin) {
-            return {
-                host: reader,
-                instance: new PluginApi(reader, plugin)
-            };
-        };
-    }
-
-//
-//  The following is adapted from Rangy's Module class:
-//
-//  Copyright (c) 2014 Tim Down
-//
-//  The MIT License (MIT)
-//  Permission is hereby granted, free of charge, to any person obtaining a copy
-//  of this software and associated documentation files (the "Software"), to deal
-//  in the Software without restriction, including without limitation the rights
-//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//  copies of the Software, and to permit persons to whom the Software is
-//  furnished to do so, subject to the following conditions:
-//
-//  The above copyright notice and this permission notice shall be included in all
-//  copies or substantial portions of the Software.
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//  SOFTWARE.
-
-    function Plugin(name, dependencies, initializer) {
-        this.name = name;
-        this.dependencies = dependencies;
-        this.initialized = false;
-        this.supported = false;
-        this.initializer = initializer;
-    }
-
-    Plugin.prototype = {
-        init: function (apiFactory) {
-            var requiredPluginNames = this.dependencies || [];
-            for (var i = 0, len = requiredPluginNames.length, requiredPlugin, PluginName; i < len; ++i) {
-                PluginName = requiredPluginNames[i];
-
-                requiredPlugin = _registeredPlugins[PluginName];
-                if (!requiredPlugin || !(requiredPlugin instanceof Plugin)) {
-                    throw new Error("required Plugin '" + PluginName + "' not found");
-                }
-
-                requiredPlugin.init(apiFactory);
-
-                if (!requiredPlugin.supported) {
-                    throw new Error("required Plugin '" + PluginName + "' not supported");
-                }
-            }
-
-            // Now run initializer
-            this.initializer(this, apiFactory.create(this));
-        },
-
-        fail: function (reason) {
-            this.initialized = true;
-            this.supported = false;
-            throw new Error("Plugin '" + this.name + "' failed to load: " + reason);
-        },
-
-        warn: function (msg) {
-            console.warn("Plugin " + this.name + ": " + msg);
-        },
-
-        deprecationNotice: function (deprecated, replacement) {
-            console.warn("DEPRECATED: " + deprecated + " in Plugin " + this.name + "is deprecated. Please use "
-            + replacement + " instead");
-        },
-
-        createError: function (msg) {
-            return new Error("Error in " + this.name + " Plugin: " + msg);
-        }
-    };
-
-    var instance = new PluginsController();
-    return instance;
-});
-
 //  LauncherOSX
 //
 //  Created by Boris Schneiderman.
@@ -15674,2622 +15479,6 @@ navigator.epubReadingSystem = {
         return false;
     }
 };
-/* Simple JavaScript Inheritance
- * By John Resig http://ejohn.org/
- * MIT Licensed.
- */
-// Inspired by base2 and Prototype
-define('readium_plugin_highlights/lib/class',[],function() {
-
-    var initializing = false,
-        fnTest = /xyz/.test(function() {
-            xyz;
-        }) ? /\b_super\b/ : /.*/;
-
-    // The base Class implementation (does nothing)
-    var Class = function() {};
-
-    // Create a new Class that inherits from this class
-    Class.extend = function(prop) {
-        var _super = this.prototype;
-
-        // Instantiate a base class (but only create the instance,
-        // don't run the init constructor)
-        initializing = true;
-        var prototype = new this();
-        initializing = false;
-
-        // Copy the properties over onto the new prototype
-        for (var name in prop) {
-            // Check if we're overwriting an existing function
-            prototype[name] = typeof prop[name] == "function" &&
-                typeof _super[name] == "function" && fnTest.test(prop[name]) ?
-                (function(name, fn) {
-                    return function() {
-                        var tmp = this._super;
-
-                        // Add a new ._super() method that is the same method
-                        // but on the super-class
-                        this._super = _super[name];
-
-                        // The method only need to be bound temporarily, so we
-                        // remove it when we're done executing
-                        var ret = fn.apply(this, arguments);
-                        this._super = tmp;
-
-                        return ret;
-                    };
-                })(name, prop[name]) :
-                prop[name];
-        }
-
-        // The dummy class constructor
-        function Class() {
-            // All construction is actually done in the init method
-            if (!initializing && this.init)
-                this.init.apply(this, arguments);
-        }
-
-        // Populate our constructed prototype object
-        Class.prototype = prototype;
-
-        // Enforce the constructor to be what we expect
-        Class.prototype.constructor = Class;
-
-        // And make this class extendable
-        Class.extend = arguments.callee;
-
-        return Class;
-    };
-
-    return Class;
-});
-
-define('readium_plugin_highlights/helpers',[],function() {
-    var HighlightHelpers = {
-        getMatrix: function($obj) {
-            var matrix = $obj.css("-webkit-transform") ||
-                $obj.css("-moz-transform") ||
-                $obj.css("-ms-transform") ||
-                $obj.css("-o-transform") ||
-                $obj.css("transform");
-            return matrix === "none" ? undefined : matrix;
-        },
-        getScaleFromMatrix: function(matrix) {
-            var matrixRegex = /matrix\((-?\d*\.?\d+),\s*0,\s*0,\s*(-?\d*\.?\d+),\s*0,\s*0\)/,
-                matches = matrix.match(matrixRegex);
-            return matches[1];
-        }
-    };
-
-    return HighlightHelpers;
-});
-
-define('readium_plugin_highlights/models/text_line_inferrer',["../lib/class"], function(Class) {
-    var TextLineInferrer = Class.extend({
-
-        init: function(options) {
-            this.lineHorizontalThreshold = options.lineHorizontalThreshold || 0;
-            this.lineHorizontalLimit = options.lineHorizontalLimit || 0;
-        },
-
-        // ----------------- PUBLIC INTERFACE --------------------------------------------------------------
-
-        inferLines: function(rectTextList) {
-            var inferredLines = [];
-            var numRects = rectTextList.length;
-            var numLines = 0;
-            var currLine;
-            var currRect;
-            var currRectTextObj;
-            var rectAppended;
-
-            // Iterate through each rect
-            for (var currRectNum = 0; currRectNum <= numRects - 1; currRectNum++) {
-                currRectTextObj = rectTextList[currRectNum];
-                currRect = currRectTextObj.rect;
-                // Check if the rect can be added to any of the current lines
-                rectAppended = false;
-
-                if (inferredLines.length > 0) {
-                    currLine = inferredLines[inferredLines.length - 1];
-
-                    if (this.includeRectInLine(currLine.line, currRect.top, currRect.left,
-                            currRect.width, currRect.height)) {
-                        rectAppended = this.expandLine(currLine.line, currRect.left, currRect.top,
-                            currRect.width, currRect.height);
-
-                        currLine.data.push(currRectTextObj);
-                    }
-                }
-
-                if (!rectAppended) {
-                    inferredLines.push({
-                        data: [currRectTextObj],
-                        line: this.createNewLine(currRect.left, currRect.top,
-                            currRect.width, currRect.height)
-                    });
-                    // Update the number of lines, so we're not using .length on every iteration
-                    numLines = numLines + 1;
-                }
-            }
-            return inferredLines;
-        },
-
-
-        // ----------------- PRIVATE HELPERS ---------------------------------------------------------------
-
-        includeRectInLine: function(currLine, rectTop, rectLeft, rectWidth, rectHeight) {
-            // is on an existing line : based on vertical position
-            if (this.rectIsWithinLineVertically(rectTop, rectHeight, currLine.maxTop, currLine.maxBottom)) {
-                if (this.rectIsWithinLineHorizontally(rectLeft, rectWidth, currLine.left,
-                        currLine.width, currLine.avgHeight)) {
-                    return true;
-                }
-            }
-            return false;
-        },
-
-        rectIsWithinLineVertically: function(rectTop, rectHeight, currLineMaxTop, currLineMaxBottom) {
-            var rectBottom = rectTop + rectHeight;
-            var lineHeight = currLineMaxBottom - currLineMaxTop;
-            var lineHeightAdjustment = (lineHeight * 0.75) / 2;
-            var rectHeightAdjustment = (rectHeight * 0.75) / 2;
-
-            rectTop = rectTop + rectHeightAdjustment;
-            rectBottom = rectBottom - rectHeightAdjustment;
-            currLineMaxTop = currLineMaxTop + lineHeightAdjustment;
-            currLineMaxBottom = currLineMaxBottom - lineHeightAdjustment;
-
-            if (rectTop === currLineMaxTop && rectBottom === currLineMaxBottom) {
-                return true;
-            } else if (rectTop < currLineMaxTop && rectBottom < currLineMaxBottom &&
-                rectBottom > currLineMaxTop) {
-                return true;
-            } else if (rectTop > currLineMaxTop && rectBottom > currLineMaxBottom &&
-                rectTop < currLineMaxBottom) {
-                return true;
-            } else if (rectTop > currLineMaxTop && rectBottom < currLineMaxBottom) {
-                return true;
-            } else if (rectTop < currLineMaxTop && rectBottom > currLineMaxBottom) {
-                return true;
-            } else {
-                return false;
-            }
-        },
-
-        rectIsWithinLineHorizontally: function(rectLeft, rectWidth, currLineLeft, currLineWidth,
-            currLineAvgHeight) {
-            var lineGapHeuristic = 2 * currLineAvgHeight;
-            var rectRight = rectLeft + rectWidth;
-            var currLineRight = rectLeft + currLineWidth;
-
-            if ((currLineLeft - rectRight) > lineGapHeuristic) {
-                return false;
-            } else if ((rectLeft - currLineRight) > lineGapHeuristic) {
-                return false;
-            } else {
-                return true;
-            }
-        },
-
-        createNewLine: function(rectLeft, rectTop, rectWidth, rectHeight) {
-            var maxBottom = rectTop + rectHeight;
-
-            return {
-                left: rectLeft,
-                startTop: rectTop,
-                width: rectWidth,
-                avgHeight: rectHeight,
-                maxTop: rectTop,
-                maxBottom: maxBottom,
-                numRects: 1
-            };
-        },
-
-        expandLine: function(currLine, rectLeft, rectTop, rectWidth, rectHeight) {
-            var lineOldRight = currLine.left + currLine.width;
-
-            // Update all the properties of the current line with rect dimensions
-            var rectRight = rectLeft + rectWidth;
-            var rectBottom = rectTop + rectHeight;
-            var numRectsPlusOne = currLine.numRects + 1;
-
-            // Average height calculation
-            var currSumHeights = currLine.avgHeight * currLine.numRects;
-            var avgHeight = Math.ceil((currSumHeights + rectHeight) / numRectsPlusOne);
-            currLine.avgHeight = avgHeight;
-            currLine.numRects = numRectsPlusOne;
-
-            // Expand the line vertically
-            currLine = this.expandLineVertically(currLine, rectTop, rectBottom);
-            currLine = this.expandLineHorizontally(currLine, rectLeft, rectRight);
-
-            return currLine;
-        },
-
-        expandLineVertically: function(currLine, rectTop, rectBottom) {
-            if (rectTop < currLine.maxTop) {
-                currLine.maxTop = rectTop;
-            }
-            if (rectBottom > currLine.maxBottom) {
-                currLine.maxBottom = rectBottom;
-            }
-
-            return currLine;
-        },
-
-        expandLineHorizontally: function(currLine, rectLeft, rectRight) {
-            var newLineLeft = currLine.left <= rectLeft ? currLine.left : rectLeft;
-            var lineRight = currLine.left + currLine.width;
-            var newLineRight = lineRight >= rectRight ? lineRight : rectRight;
-            var newLineWidth = newLineRight - newLineLeft;
-
-            //cancel the expansion if the line is going to expand outside a horizontal limit
-            //this is used to prevent lines from spanning multiple columns in a two column epub view
-            var horizontalThreshold = this.lineHorizontalThreshold;
-            var horizontalLimit = this.lineHorizontalLimit;
-
-            var leftBoundary = Math.floor(newLineLeft / horizontalLimit) * horizontalLimit;
-            var centerBoundary = leftBoundary + horizontalThreshold;
-            var rightBoundary = leftBoundary + horizontalLimit;
-            if ((newLineLeft > leftBoundary && newLineRight > centerBoundary && newLineLeft < centerBoundary) || (newLineLeft > centerBoundary && newLineRight > rightBoundary)) {
-                return undefined;
-            }
-
-            currLine.left = newLineLeft;
-            currLine.width = newLineWidth;
-
-            return currLine;
-        }
-    });
-
-    return TextLineInferrer;
-});
-
-// https://github.com/heygrady/Units
-//
-// Copyright (c) 2013 Grady Kuhnline
-//
-// MIT License
-//
-// Permission is hereby granted, free of charge, to any person obtaining
-// a copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to
-// permit persons to whom the Software is furnished to do so, subject to
-// the following conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-// LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-// WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-define('readium_plugin_highlights/lib/length',[],function() {
-    return function(document) {
-        "use strict";
-
-        // create a test element
-        var testElem = document.createElement('test'),
-            docElement = document.documentElement,
-            defaultView = document.defaultView,
-            getComputedStyle = defaultView && defaultView.getComputedStyle,
-            computedValueBug,
-            runit = /^(-?[\d+\.\-]+)([a-z]+|%)$/i,
-            convert = {},
-            conversions = [1 / 25.4, 1 / 2.54, 1 / 72, 1 / 6],
-            units = ['mm', 'cm', 'pt', 'pc', 'in', 'mozmm'],
-            i = 6; // units.length
-
-        // add the test element to the dom
-        docElement.appendChild(testElem);
-
-        // test for the WebKit getComputedStyle bug
-        // @see http://bugs.jquery.com/ticket/10639
-        if (getComputedStyle) {
-            // add a percentage margin and measure it
-            testElem.style.marginTop = '1%';
-            computedValueBug = getComputedStyle(testElem).marginTop === '1%';
-        }
-
-        // pre-calculate absolute unit conversions
-        while (i--) {
-            convert[units[i] + "toPx"] = conversions[i] ? conversions[i] * convert.inToPx : toPx(testElem, '1' + units[i]);
-        }
-
-        // remove the test element from the DOM and delete it
-        docElement.removeChild(testElem);
-        testElem = undefined;
-
-        // convert a value to pixels
-        function toPx(elem, value, prop, force) {
-            // use width as the default property, or specify your own
-            prop = prop || 'width';
-
-            var style,
-                inlineValue,
-                ret,
-                unit = (value.match(runit) || [])[2],
-                conversion = unit === 'px' ? 1 : convert[unit + 'toPx'],
-                rem = /r?em/i;
-
-            if (conversion || rem.test(unit) && !force) {
-                // calculate known conversions immediately
-                // find the correct element for absolute units or rem or fontSize + em or em
-                elem = conversion ? elem : unit === 'rem' ? docElement : prop === 'fontSize' ? elem.parentNode || elem : elem;
-
-                // use the pre-calculated conversion or fontSize of the element for rem and em
-                conversion = conversion || parseFloat(curCSS(elem, 'fontSize'));
-
-                // multiply the value by the conversion
-                ret = parseFloat(value) // conversion;
-            } else {
-                // begin "the awesome hack by Dean Edwards"
-                // @see http://erik.eae.net/archives/2007/07/27/18.54.15/#comment-102291
-
-                // remember the current style
-                style = elem.style;
-                inlineValue = style[prop];
-
-                // set the style on the target element
-                try {
-                    style[prop] = value;
-                } catch (e) {
-                    // IE 8 and below throw an exception when setting unsupported units
-                    return 0;
-                }
-
-                // read the computed value
-                // if style is nothing we probably set an unsupported unit
-                ret = !style[prop] ? 0 : parseFloat(curCSS(elem, prop));
-
-                // reset the style back to what it was or blank it out
-                style[prop] = inlineValue !== undefined ? inlineValue : null;
-            }
-
-            // return a number
-            return ret;
-        }
-
-        // return the computed value of a CSS property
-        function curCSS(elem, prop) {
-            var value,
-                pixel,
-                unit,
-                rvpos = /^top|bottom/,
-                outerProp = ["paddingTop", "paddingBottom", "borderTop", "borderBottom"],
-                innerHeight,
-                parent,
-                i = 4; // outerProp.length
-
-            if (getComputedStyle) {
-                // FireFox, Chrome/Safari, Opera and IE9+
-                value = getComputedStyle(elem)[prop];
-            } else if (pixel = elem.style['pixel' + prop.charAt(0).toUpperCase() + prop.slice(1)]) {
-                // IE and Opera support pixel shortcuts for top, bottom, left, right, height, width
-                // WebKit supports pixel shortcuts only when an absolute unit is used
-                value = pixel + 'px';
-            } else if (prop === 'fontSize') {
-                // correct IE issues with font-size
-                // @see http://bugs.jquery.com/ticket/760
-                value = toPx(elem, '1em', 'left', 1) + 'px';
-            } else {
-                // IE 8 and below return the specified style
-                value = elem.currentStyle[prop];
-            }
-
-            // check the unit
-            unit = (value.match(runit) || [])[2];
-            if (unit === '%' && computedValueBug) {
-                // WebKit won't convert percentages for top, bottom, left, right, margin and text-indent
-                if (rvpos.test(prop)) {
-                    // Top and bottom require measuring the innerHeight of the parent.
-                    innerHeight = (parent = elem.parentNode || elem).offsetHeight;
-                    while (i--) {
-                        innerHeight -= parseFloat(curCSS(parent, outerProp[i]));
-                    }
-                    value = parseFloat(value) / 100 // innerHeight + 'px';
-                } else {
-                    // This fixes margin, left, right and text-indent
-                    // @see https://bugs.webkit.org/show_bug.cgi?id=29084
-                    // @see http://bugs.jquery.com/ticket/10639
-                    value = toPx(elem, value);
-                }
-            } else if ((value === 'auto' || (unit && unit !== 'px')) && getComputedStyle) {
-                // WebKit and Opera will return auto in some cases
-                // Firefox will pass back an unaltered value when it can't be set, like top on a static element
-                value = 0;
-            } else if (unit && unit !== 'px' && !getComputedStyle) {
-                // IE 8 and below won't convert units for us
-                // try to convert using a prop that will return pixels
-                // this will be accurate for everything (except font-size and some percentages)
-                value = toPx(elem, value) + 'px';
-            }
-            return value;
-        }
-
-        // export the conversion function
-        return {
-            toPx: toPx
-        };
-    };
-});
-
-define('readium_plugin_highlights/models/copied_text_styles',[],function() {
-    return [
-        "color",
-        "font-family",
-        "font-size",
-        "font-weight",
-        "font-style",
-        //"line-height",
-        "text-decoration",
-        "text-transform",
-        "text-shadow",
-        "letter-spacing",
-
-        "text-rendering",
-        "font-kerning",
-        "font-language-override",
-        "font-size-adjust",
-        "font-stretch",
-        "font-synthesis",
-        "font-variant",
-        "font-variant-alternates",
-        "font-variant-caps",
-        "font-variant-east-asian",
-        "font-variant-ligatures",
-        "font-variant-numeric",
-        "font-variant-position",
-        "-webkit-font-smoothing ",
-
-        "-ms-writing-mode",
-        "-webkit-writing-mode",
-        "-moz-writing-mode",
-        "-ms-writing-mode",
-        "writing-mode",
-
-        "-webkit-text-orientation",
-        "-moz-text-orientation",
-        "-ms-text-orientation",
-        "text-orientation: mixed"
-    ];
-});
-
-define('readium_plugin_highlights/views/view',["jquery", "underscore", "../lib/class", "../lib/length", "../models/text_line_inferrer", "../models/copied_text_styles"],
-function($, _, Class, Length, TextLineInferrer, CopiedTextStyles) {
-    // This is not a backbone view.
-
-    var HighlightView = Class.extend({
-        // this is an element that highlight will be associated with, it is not styled at this point
-        template: "<div class=\"rd-highlight\"></div>",
-
-        init: function(context, options) {
-            this.context = context;
-
-            this.lengthLib = new Length(this.context.document);
-
-            this.highlight = {
-                id: options.id,
-                CFI: options.CFI,
-                type: options.type,
-                top: options.top,
-                left: options.left,
-                height: options.height,
-                width: options.width,
-                styles: options.styles,
-                contentRenderData: options.contentRenderData
-            };
-
-            this.swipeThreshold = 10;
-            this.swipeVelocity = 0.65; // in px/ms
-        },
-
-        render: function() {
-            this.$el = $(this.template, this.context.document);
-            this.$el.attr('data-id', this.highlight.id);
-            this.updateStyles();
-            this.renderContent();
-            return this.$el;
-        },
-
-        remove: function() {
-            this.highlight = null;
-            this.context = null;
-            this.$el.remove();
-        },
-
-
-
-        resetPosition: function(top, left, height, width) {
-            _.assign(this.highlight, {
-                top: top,
-                left: left,
-                height: height,
-                width: width
-            });
-            this.setCSS();
-        },
-
-        setStyles: function(styles) {
-            this.highlight.styles = styles;
-            this.updateStyles();
-        },
-
-        update: function(type, styles) {
-            // save old type
-            var oldType = this.highlight.type;
-
-            _.assign(this.highlight, {
-                type: type,
-                styles: styles
-            });
-
-            // we need to fully restyle view elements
-            // remove all the "inline" styles
-            this.$el.removeAttr("style");
-
-            // remove class applied by "type"
-            this.$el.removeClass(oldType);
-
-            this.updateStyles();
-        },
-
-        updateStyles: function() {
-            this.setBaseHighlight();
-            this.setCSS();
-        },
-
-        // Will return null or false if :first-line/letter would not apply to the first text node child
-        getFirstTextNodeChild: function(elem) {
-            for (var i = 0; i < elem.childNodes.length; i++) {
-                var child = elem.childNodes[i];
-                if (child.nodeType === Node.TEXT_NODE) {
-                    return child;
-                }
-
-                if (child.nodeType === Node.ELEMENT_NODE) {
-                    var doc = child.ownerDocument;
-                    var style = doc.defaultView.getComputedStyle(child);
-                    // If it's not an element we can definitely ignore
-                    if ((style['position'] !== 'absolute' && style['position'] !== 'fixed') &&
-                        style['float'] === 'none' && style['display'] !== 'none') {
-                        if (style['display'] === 'inline') {
-                            var result = this.getFirstTextNodeChild(child);
-                            if (result) {
-                                return result;
-                            } else if (result === false) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-            }
-            return null;
-        },
-
-        // Returns the styles which apply to the first line of the specified element, or null if there aren't any
-        // Assumes that the specified argument is a block element
-        getFirstLineStyles: function(elem) {
-            var win = elem.ownerDocument.defaultView;
-            if (!win.getMatchedCSSRules) {
-                // Without getMatchingCSSRules, we can't get first-line styles
-                return null;
-            }
-            while (elem) {
-                var styles = win.getMatchedCSSRules(elem, 'first-line');
-                if (styles) {
-                    return styles[0].style;
-                }
-
-                // Go through previous siblings, return null if there's a non-empty text node, or an element that's
-                // not display: none; - both of these prevent :first-line styles from the parents from applying
-                var sibling = elem;
-                while (sibling = sibling.previousSibling) {
-                    if (sibling.nodeType === Node.ELEMENT_NODE) {
-                        var siblingStyles = win.getComputedStyle(sibling);
-                        if (siblingStyles['display'] !== 'none') {
-                            return null;
-                        }
-                    } else if (sibling.nodeType === Node.TEXT_NODE && sibling.textContent.match(/\S/)) {
-                        return null;
-                    }
-                };
-                elem = elem.parentNode;
-            }
-        },
-
-        renderContent: function() {
-            var that = this;
-            var renderData = this.highlight.contentRenderData;
-            if (renderData) {
-                _.each(renderData.data, function(data) {
-                    var $ancestor = $(data.ancestorEl);
-                    var $blockAncestor = $(data.blockAncestorEl);
-                    var document = data.ancestorEl.ownerDocument;
-
-                    var el = document.createElement("div");
-                    el.style.position = 'absolute';
-                    el.style.top = (data.rect.top - renderData.top) + "px";
-                    el.style.left = (data.rect.left - renderData.left) + "px";
-                    el.style.width = (data.rect.width + 1) + "px";
-                    el.style.height = data.rect.height + "px";
-
-                    var copyStyles = function(copyFrom, copyTo) {
-                        _.each(CopiedTextStyles, function(styleName) {
-                            var style = copyFrom[styleName];
-                            if (style) {
-                                copyTo[styleName] = style;
-                            }
-                        });
-                    };
-
-                    var copiedStyles = $ancestor.data("rd-copied-text-styles");
-                    if (!copiedStyles) {
-                        copiedStyles = {};
-                        var computedStyle = document.defaultView.getComputedStyle(data.ancestorEl);
-                        copyStyles(computedStyle, copiedStyles);
-                        $ancestor.data("rd-copied-text-styles", copiedStyles);
-                    }
-
-                    var copiedFirstLineStyles = $blockAncestor.data("rd-copied-first-line-styles");
-                    if (copiedFirstLineStyles === undefined) {
-                        copiedFirstLineStyles = null;
-                        var firstLineStyles = that.getFirstLineStyles(data.blockAncestorEl);
-                        if (firstLineStyles) {
-                            copiedFirstLineStyles = {};
-                            copyStyles(firstLineStyles, copiedFirstLineStyles);
-                            // Delete text-transform because it doesn't apply in Chrome on :first-line
-                            delete copiedFirstLineStyles['text-transform'];
-                            _.each(["font-size", "letter-spacing"], function(styleName) {
-                                if (copiedFirstLineStyles[styleName]) {
-                                    copiedFirstLineStyles[styleName] = that.lengthLib.toPx(data.ancestorEl, copiedFirstLineStyles[styleName]) + "px";
-                                }
-                            });
-                        }
-                        $blockAncestor.data("rd-copied-first-line-styles", copiedFirstLineStyles);
-                    }
-
-                    if (copiedFirstLineStyles) {
-                        var textNode = that.getFirstTextNodeChild(data.blockAncestorEl);
-                        var range = document.createRange();
-                        range.setStart(textNode, 0);
-                        range.setEnd(data.node, data.startOffset + 1);
-                        var rects = range.getClientRects();
-                        var inferrer = new TextLineInferrer({
-                            lineHorizontalThreshold: $("body", document).clientWidth,
-                            lineHorizontalLimit: document.defaultView.innerWidth
-                        });
-                        if (inferrer.inferLines(_.map(rects, function(rect) {
-                                return {
-                                    rect: rect
-                                }
-                            })).length > 1) {
-                            copiedFirstLineStyles = null;
-                        }
-                    }
-
-                    _.each(copiedStyles, function(style, styleName) {
-                        style = copiedFirstLineStyles ? copiedFirstLineStyles[styleName] || style : style;
-                        el.style[styleName] = style;
-                    });
-                    el.style["line-height"] = data.rect.height + "px";
-
-                    el.appendChild(document.createTextNode(data.text));
-                    that.$el[0].appendChild(el);
-                });
-                processedElements = null;
-                computedStyles = null;
-            }
-        },
-
-        setCSS: function() {
-            // set highlight's absolute position
-            this.$el.css({
-                "position": "absolute",
-                "top": this.highlight.top + "px",
-                "left": this.highlight.left + "px",
-                "height": this.highlight.height + "px",
-                "width": this.highlight.width + "px"
-            });
-
-            // apply styles, if any
-            var styles = this.highlight.styles || {};
-            try {
-                this.$el.css(styles);
-            } catch (ex) {
-                console.log('EpubAnnotations: invalid css styles');
-            }
-        },
-
-        setBaseHighlight: function(removeFocus) {
-            var type = this.highlight.type;
-            this.$el.addClass(type);
-            this.$el.removeClass("hover-" + type);
-            if (removeFocus) {
-                this.$el.removeClass("focused-" + type);
-            }
-        },
-
-        setHoverHighlight: function() {
-            var type = this.highlight.type;
-            this.$el.addClass("hover-" + type);
-            this.$el.removeClass(type);
-        },
-
-        setFocusedHighlight: function() {
-            var type = this.highlight.type;
-            this.$el.addClass("focused-" + type);
-            this.$el.removeClass(type).removeClass("hover-" + type);
-        },
-
-        setVisibility: function(value) {
-            if (value) {
-                this.$el.css('display', '');
-            } else {
-                this.$el.css('display', 'none');
-            }
-        },
-
-    });
-
-    return HighlightView;
-});
-
-define('readium_plugin_highlights/views/border_view',["./view"], function(HighlightView) {
-
-    // This is not a backbone view.
-
-    var HighlightBorderView = HighlightView.extend({
-
-        template: "<div class=\"rd-highlight-border\"></div>",
-
-        setCSS: function() {
-
-            this.$el.css({
-                backgroundClip: 'padding-box',
-                borderStyle: 'solid',
-                borderWidth: '5px',
-                boxSizing: "border-box"
-            });
-            this._super();
-        },
-
-        setBaseHighlight: function() {
-
-            this.$el.addClass("highlight-border");
-            this.$el.removeClass("hover-highlight-border").removeClass("focused-highlight-border");
-        },
-
-        setHoverHighlight: function() {
-
-            this.$el.addClass("hover-highlight-border");
-            this.$el.removeClass("highlight-border");
-        },
-
-        setFocusedHighlight: function() {
-            this.$el.addClass('focused-highlight-border');
-            this.$el.removeClass('highlight-border').removeClass('hover-highlight-border');
-        }
-    });
-
-    return HighlightBorderView;
-});
-
-define('readium_plugin_highlights/models/group',["jquery", "underscore", "../lib/class", "./text_line_inferrer", "../views/view", "../views/border_view", "../helpers"],
-function($, _, Class, TextLineInferrer, HighlightView, HighlightBorderView, HighlightHelpers) {
-
-    var debouncedTrigger = _.debounce(
-        function(fn, eventName) {
-            fn(eventName);
-        }, 10);
-
-    var HighlightGroup = Class.extend({
-
-        init: function(context, options) {
-            this.context = context;
-
-            this.highlightViews = [];
-
-            this.CFI = options.CFI;
-            this.selectedNodes = options.selectedNodes;
-            this.offsetTopAddition = options.offsetTopAddition;
-            this.offsetLeftAddition = options.offsetLeftAddition;
-            this.styles = options.styles;
-            this.id = options.id;
-            this.type = options.type;
-            this.scale = options.scale;
-            this.selectionText = options.selectionText;
-            this.visible = options.visible;
-            this.rangeInfo = options.rangeInfo;
-
-            this.constructHighlightViews();
-        },
-
-        onHighlightEvent: function(event, type) {
-            var that = this;
-            var documentFrame = this.context.iframe;
-            var topView = this.context.manager;
-            var triggerEvent = _.partial(topView.trigger, _, that.type,
-                that.CFI, that.id, event, documentFrame);
-
-            if (type === "click" || type === "touchend") {
-                debouncedTrigger(triggerEvent, "annotationClicked");
-
-            } else if (type === "contextmenu") {
-                triggerEvent("annotationRightClicked");
-
-            } else if (type === "mousemove") {
-                triggerEvent("annotationMouseMove");
-
-            } else if (type === "mouseenter") {
-                triggerEvent("annotationHoverIn");
-
-            } else if (type === "mouseleave") {
-                triggerEvent("annotationHoverOut");
-
-            } else if (type === "mousedown") {
-                // prevent selection when right clicking
-                var preventEvent = function(event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    documentFrame.contentDocument.removeEventListener(event.type, preventEvent);
-                };
-                if (event.button === 2) {
-                    event.preventDefault();
-                    documentFrame.contentDocument.addEventListener("selectstart", preventEvent);
-                    documentFrame.contentDocument.addEventListener("mouseup", preventEvent);
-                    documentFrame.contentDocument.addEventListener("click", preventEvent);
-                    documentFrame.contentDocument.addEventListener("contextmenu", preventEvent);
-                }
-            }
-
-            // "mouseenter" and "mouseleave" events not only trigger corresponding named event, but also
-            // affect the appearance
-            if (type === "mouseenter" || type === "mouseleave") {
-                // Change appearance of highlightViews constituting this highlight group
-                // do not iterate over secondary highlight views (hightlightViewsSecondary)
-                _.each(this.highlightViews, function(highlightView) {
-
-                    if (type === "mouseenter") {
-                        highlightView.setHoverHighlight();
-                    } else if (type === "mouseleave") {
-                        highlightView.setBaseHighlight(false);
-                    }
-                });
-            }
-
-        },
-
-        normalizeRectangle: function(rect) {
-            return {
-                left: rect.left,
-                right: rect.right,
-                top: rect.top,
-                bottom: rect.bottom,
-                width: rect.right - rect.left,
-                height: rect.bottom - rect.top
-            };
-        },
-
-        // produces an event string corresponding to "pointer events" that we want to monitor on the
-        // bound HL container. We are adding namespace to the event names in order to be able to
-        // remove them by specifying <eventname>.<namespace> only, rather than classic callback function
-        getBoundHighlightContainerEvents: function() {
-            // these are the event names that we handle in "onHighlightEvent"
-            var boundHighlightContainerEvents = ["click", "touchstart", "touchend", "touchmove", "contextmenu",
-                "mouseenter", "mouseleave", "mousemove", "mousedown"
-            ];
-            var namespace = ".rdjsam-" + this.id;
-            return boundHighlightContainerEvents.map(function(e) {
-                return e + namespace;
-            }).join(" ");
-        },
-
-        getFirstBlockParent: function(elem) {
-            var win = elem.ownerDocument.defaultView;
-            do {
-                var style = win.getComputedStyle(elem);
-                if (style['display'] !== 'inline') {
-                    return elem;
-                }
-            } while (elem = elem.parentNode);
-        },
-
-        // construct view for each rectangle constituting HL group
-        constructHighlightViews: function() {
-            var that = this;
-            if (!this.visible)
-                return;
-
-            var rectTextList = [];
-
-            // this is an array of elements (not Node.TEXT_NODE) that are part of HL group
-            // they will presented as HighlightBorderView
-            var rectElementList = [];
-            var inferrer;
-            var inferredLines;
-            var allContainerRects = [];
-            var hoverThreshold = 2; // Pixels to expand each rect on each side, for hovering/clicking purposes
-            var rangeInfo = this.rangeInfo;
-            var selectedNodes = this.selectedNodes;
-            var includeMedia = this.includeMedia;
-            var contentDocumentFrame = this.context.iframe;
-            var highlightStyles = this.styles;
-            var cloneTextMode = highlightStyles ? highlightStyles['-rd-highlight-mode'] === 'clone-text' : false;
-
-            function pushToRectTextList(range) {
-                var match,
-                    rangeText = range.toString(),
-                    rects = [],
-                    node = range.startContainer,
-                    ancestor = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE ? range.commonAncestorContainer : range.commonAncestorContainer.parentNode,
-                    blockAncestor = that.getFirstBlockParent(ancestor),
-                    baseOffset = range.startOffset,
-                    rgx = /\S+/g;
-
-                if (cloneTextMode) {
-                    while (match = rgx.exec(rangeText)) {
-                        var startOffset = baseOffset + rgx.lastIndex - match[0].length,
-                            endOffset = baseOffset + rgx.lastIndex;
-                        range.setStart(node, startOffset);
-                        range.setEnd(node, endOffset);
-                        var clientRects = range.getClientRects();
-                        var curRect = 0;
-                        var curStart = startOffset;
-                        var curEnd = curStart;
-                        while (curRect < clientRects.length) {
-                            var saveRect = false;
-                            if (clientRects[curRect].width === 0 || clientRects[curRect].height === 0) {
-                                curRect++;
-                                continue;
-                            }
-                            if (curRect === clientRects.length - 1) {
-                                curEnd = endOffset;
-                                saveRect = true;
-                            } else {
-                                curEnd++;
-                                range.setStart(node, curStart);
-                                range.setEnd(node, curEnd);
-                                var tempRects = range.getClientRects();
-                                var tempRect = tempRects[0];
-                                // Skip over empty first rect if there is one
-                                if (tempRects.length > 1 && (tempRect.width === 0 || tempRect.height === 0)) {
-                                    tempRect = tempRects[1];
-                                }
-                                var differences = 0;
-                                _.each(["top", "left", "bottom", "right"], function(prop) {
-                                    differences += (tempRects[0][prop] !== clientRects[curRect][prop] ? 1 : 0);
-                                });
-                                if (differences === 0) {
-                                    saveRect = true;
-                                }
-                            }
-                            if (saveRect) {
-                                rects.push({
-                                    rect: clientRects[curRect],
-                                    text: node.textContent.substring(curStart, curEnd),
-                                    node: node,
-                                    startOffset: curStart
-                                });
-                                curRect++;
-                                curStart = curEnd;
-                            }
-                        }
-                    }
-                } else {
-                    _.each(range.getClientRects(), function(rect) {
-                        rects.push({
-                            rect: rect,
-                            text: rangeText
-                        });
-                    });
-                }
-                _.each(rects, function(rect) {
-                    var normalizedRect = that.normalizeRectangle(rect.rect);
-
-                    //filter out empty rectangles
-                    if (normalizedRect.width === 0 || normalizedRect.height === 0) {
-                        return;
-                    }
-
-                    // push both rect and ancestor in the list
-                    rectTextList.push({
-                        rect: normalizedRect,
-                        text: rect.text,
-                        ancestorEl: ancestor,
-                        blockAncestorEl: blockAncestor,
-                        node: rect.node,
-                        startOffset: rect.startOffset
-                    });
-                });
-            }
-
-            // if range is within one node
-            if (rangeInfo && rangeInfo.startNode === rangeInfo.endNode) {
-                var node = rangeInfo.startNode;
-                var range = that.context.document.createRange();
-                range.setStart(node, rangeInfo.startOffset);
-                range.setEnd(node, rangeInfo.endOffset);
-
-                // we are only interested in TEXT_NODE
-                if (node.nodeType === Node.TEXT_NODE) {
-                    // get client rectangles for the range and push them into rectTextList
-                    pushToRectTextList(range);
-                    selectedNodes = [];
-                }
-            }
-
-            // multi-node range, for each selected node
-            _.each(selectedNodes, function(node) {
-                // create new Range
-                var range = that.context.document.createRange();
-                if (node.nodeType === Node.TEXT_NODE) {
-                    if (rangeInfo && node === rangeInfo.startNode && rangeInfo.startOffset !== 0) {
-                        range.setStart(node, rangeInfo.startOffset);
-                        range.setEnd(node, node.length);
-                    } else if (rangeInfo && node === rangeInfo.endNode && rangeInfo.endOffset !== 0) {
-                        range.setStart(node, 0);
-                        range.setEnd(node, rangeInfo.endOffset);
-                    } else {
-                        range.selectNodeContents(node);
-                    }
-
-                    // for each client rectangle
-                    pushToRectTextList(range);
-                } else if (node.nodeType === Node.ELEMENT_NODE && includeMedia) {
-                    // non-text node element
-                    // if we support this elements in the HL group
-                    if (_.contains(["img", "video", "audio"], node.tagName.toLowerCase())) {
-                        // set the Range to contain the node and its contents and push rectangle to the list
-                        range.selectNode(node);
-                        rectElementList.push(range.getBoundingClientRect());
-                    }
-                }
-            });
-
-            var $html = $(that.context.document.documentElement);
-
-            function calculateScale() {
-                var scale = that.scale;
-                //is there a transform scale for the content document?
-                var matrix = HighlightHelpers.getMatrix($html);
-                if (!matrix && (that.context.isIe9 || that.context.isIe10)) {
-                    //if there's no transform scale then set the scale as the IE zoom factor
-                    scale = (window.screen.deviceXDPI / 96); //96dpi == 100% scale
-                } else if (matrix) {
-                    scale = HighlightHelpers.getScaleFromMatrix(matrix);
-                }
-                return scale;
-            }
-
-            var scale = calculateScale();
-
-            inferrer = new TextLineInferrer({
-                lineHorizontalThreshold: $("body", $html).clientWidth,
-                lineHorizontalLimit: contentDocumentFrame.contentWindow.innerWidth
-            });
-
-            // only take "rect" property when inferring lines
-            inferredLines = inferrer.inferLines(rectTextList);
-            _.each(inferredLines, function(line, index) {
-                var renderData = line.data;
-                //console.log(line.data);
-                line = line.line;
-                var highlightTop = (line.startTop + that.offsetTopAddition) / scale;
-                var highlightLeft = (line.left + that.offsetLeftAddition) / scale;
-                var highlightHeight = line.avgHeight / scale;
-                var highlightWidth = line.width / scale;
-                allContainerRects.push({
-                    top: highlightTop - hoverThreshold,
-                    left: highlightLeft - hoverThreshold,
-                    bottom: highlightTop + highlightHeight + hoverThreshold * 2,
-                    right: highlightLeft + highlightWidth + hoverThreshold * 2,
-                });
-
-                var highlightView = new HighlightView(that.context, {
-                    id: that.id,
-                    CFI: that.CFI,
-                    type: that.type,
-                    top: highlightTop,
-                    left: highlightLeft,
-                    height: highlightHeight,
-                    width: highlightWidth,
-                    styles: _.extend({
-                        "z-index": "1000",
-                        "pointer-events": "none"
-                    }, highlightStyles),
-                    contentRenderData: cloneTextMode ? {
-                        data: renderData,
-                        top: line.startTop,
-                        left: line.left
-                    } : null
-                });
-
-                that.highlightViews.push(highlightView);
-            });
-
-            // deal with non TEXT_NODE elements
-            _.each(rectElementList, function(rect) {
-                var highlightTop = (rect.top + that.offsetTopAddition) / scale;
-                var highlightLeft = (rect.left + that.offsetLeftAddition) / scale;
-                var highlightHeight = rect.height / scale;
-                var highlightWidth = rect.width / scale;
-                allContainerRects.push({
-                    top: highlightTop - hoverThreshold,
-                    left: highlightLeft - hoverThreshold,
-                    bottom: highlightTop + highlightHeight + hoverThreshold * 2,
-                    right: highlightLeft + highlightWidth + hoverThreshold * 2,
-                });
-
-                var highlightView = new HighlightBorderView(this.context, {
-                    highlightId: that.id,
-                    CFI: that.CFI,
-                    top: highlightTop,
-                    left: highlightLeft,
-                    height: highlightHeight,
-                    width: highlightWidth,
-                    styles: highlightStyles
-                });
-
-                that.highlightViews.push(highlightView);
-            });
-
-            // this is a flag indicating if mouse is currently within the boundary of HL group
-            var mouseEntered = false;
-
-            // helper function to test if a point is within a rectangle
-            function pointRectangleIntersection(point, rect) {
-                return point.x > rect.left && point.x < rect.right &&
-                    point.y > rect.top && point.y < rect.bottom;
-            };
-
-            // e is a jQuery event wrapper (use e.originalEvent to access the raw object)
-            that.boundHighlightCallback = function(e) {
-                var scale = calculateScale();
-                var mouseIsInside = false;
-
-                var x = e.pageX;
-                var y = e.pageY;
-
-                if (e.type === 'touchend') {
-                    var lastTouch = _.last(e.originalEvent.changedTouches);
-                    x = lastTouch.pageX;
-                    y = lastTouch.pageY;
-                }
-
-                var point = {
-                    x: (x + that.offsetLeftAddition) / scale,
-                    y: (y + that.offsetTopAddition) / scale
-                };
-
-                _.each(allContainerRects, function(rect) {
-
-                    if (pointRectangleIntersection(point, rect)) {
-                        mouseIsInside = true;
-                        // if event is "click" and there is an active selection
-                        if (e.type === "click") {
-                            var sel = e.target.ownerDocument.getSelection();
-                            // had to add this check to make sure that rangeCount is not 0
-                            if (sel && sel.rangeCount && !sel.getRangeAt(0).collapsed) {
-                                //do not trigger a click when there is an active selection
-                                return;
-                            }
-                        }
-
-                        var isTouchEvent = e.type.indexOf('touch') !== -1;
-
-                        if (isTouchEvent) {
-                            // call "normal" event handler for HL group to touch capable devices
-                            that.onHighlightEvent(e, e.type);
-                        }
-
-                        // if this is the first time we are mouse entering in the area
-                        if (!mouseEntered) {
-                            // regardless of the actual event type we want highlightGroupCallback process "mouseenter"
-                            that.onHighlightEvent(e, "mouseenter");
-
-                            // set flag indicating that we are in HL group confines
-                            mouseEntered = true;
-                            return;
-                        } else if (!isTouchEvent) {
-                            // call "normal" event handler for HL group to desktop devices
-                            that.onHighlightEvent(e, e.type);
-                        }
-                    }
-                });
-
-                if (!mouseIsInside && mouseEntered) {
-                    // set flag indicating that we left HL group confines
-                    mouseEntered = false;
-                    that.onHighlightEvent(e, "mouseleave");
-                }
-            };
-            that.boundHighlightElement = $html;
-            $html.on(this.getBoundHighlightContainerEvents(), that.boundHighlightCallback);
-        },
-
-        resetHighlights: function(viewportElement, offsetTop, offsetLeft) {
-            this.offsetTopAddition = offsetTop;
-            this.offsetLeftAddition = offsetLeft;
-            this.destroyCurrentHighlights();
-            this.constructHighlightViews();
-            this.renderHighlights(viewportElement);
-        },
-
-        destroyCurrentHighlights: function() {
-            var that = this;
-            _.each(this.highlightViews, function(highlightView) {
-                highlightView.remove();
-            });
-
-            var events = that.getBoundHighlightContainerEvents();
-            var $el = this.boundHighlightElement;
-            if ($el) {
-                $el.off(events, this.boundHighlightCallback);
-            }
-
-            this.boundHighlightCallback = null;
-            this.boundHighlightElement = null;
-
-            this.highlightViews.length = 0;
-        },
-
-        renderHighlights: function(viewportElement) {
-            // higlight group is live, it just doesn't need to be visible, yet.
-            if (!this.visible) {
-                return;
-            }
-
-            _.each(this.highlightViews, function(view, index) {
-                $(viewportElement).append(view.render());
-            });
-        },
-
-        toInfo: function() {
-            // get array of rectangles for all the HightligtViews
-            var rectangleArray = [];
-            var offsetTopAddition = this.offsetTopAddition;
-            var offsetLeftAddition = this.offsetLeftAddition;
-            var scale = this.scale;
-            _.each(this.highlightViews, function(view, index) {
-                var hl = view.highlight;
-                rectangleArray.push({
-                    top: (hl.top - offsetTopAddition) * scale,
-                    left: (hl.left - offsetLeftAddition) * scale,
-                    height: hl.height * scale,
-                    width: hl.width * scale
-                });
-            });
-
-            return {
-                id: this.id,
-                type: this.type,
-                CFI: this.CFI,
-                rectangleArray: rectangleArray,
-                selectedText: this.selectionText
-            };
-        },
-
-        setStyles: function(styles) {
-            this.styles = styles;
-            _.each(this.highlightViews, function(view, index) {
-                view.setStyles(styles);
-            });
-        },
-
-        update: function(type, styles) {
-            this.type = type;
-            this.styles = styles;
-
-            // for each View of the HightlightGroup
-            _.each(this.highlightViews, function(view, index) {
-                view.update(type, styles);
-            });
-        },
-
-        setState: function(state, value) {
-            _.each(this.highlightViews, function(view, index) {
-                if (state === "hover") {
-                    if (value) {
-                        view.setHoverHighlight();
-                    } else {
-                        view.setBaseHighlight(false);
-                    }
-                } else if (state === "visible") {
-                    view.setVisibility(value);
-                } else if (state === "focused") {
-                    if (value) {
-                        view.setFocusedHighlight();
-                    } else {
-                        view.setBaseHighlight(true);
-                    }
-
-                }
-            });
-        }
-    });
-
-    return HighlightGroup;
-});
-
-define('readium_plugin_highlights/controller',["jquery", "underscore", "./lib/class", "./helpers", "./models/group"],
-function($, _, Class, HighlightHelpers, HighlightGroup) {
-    var HighlightsController = Class.extend({
-
-        highlights: [],
-        annotationHash: {},
-        offsetTopAddition: 0,
-        offsetLeftAddition: 0,
-        readerBoundElement: undefined,
-        scale: 0,
-
-        init: function(context, options) {
-            this.context = context;
-
-            this.epubCFI = EPUBcfi;
-            this.readerBoundElement = this.context.document.documentElement;
-
-            if (options.getVisibleCfiRangeFn) {
-                this.getVisibleCfiRange = options.getVisibleCfiRangeFn;
-            }
-
-            // inject annotation CSS into iframe
-            if (this.context.cssUrl) {
-                this._injectAnnotationCSS(this.context.cssUrl);
-            }
-
-            // emit an event when user selects some text.
-            var that = this;
-            this.context.document.addEventListener("mouseup", function(event) {
-                var range = that._getCurrentSelectionRange();
-                if (range === undefined) {
-                    return;
-                }
-                if (range.startOffset - range.endOffset) {
-                    that.context.manager.trigger("textSelectionEvent", event, range, that.context.iframe);
-                }
-            });
-
-            if (!rangy.initialized) {
-                rangy.init();
-            }
-        },
-
-        getVisibleCfiRange: function() {
-            // returns {firstVisibleCfi: <>, lastVisibleCfi: <>}
-            // implemented in Readium.ReaderView, passed in via options
-        },
-
-        // ------------------------------------------------------------------------------------ //
-        //  "PUBLIC" METHODS (THE API)                                                          //
-        // ------------------------------------------------------------------------------------ //
-
-        redraw: function() {
-            var that = this;
-
-            var leftAddition = -this._getPaginationLeftOffset();
-            
-            var isVerticalWritingMode = this.context.paginationInfo().isVerticalWritingMode;
-
-            var visibleCfiRange = this.getVisibleCfiRange();
-
-            // Highlights
-            _.each(this.highlights, function(highlightGroup) {
-                var visible = true;
-
-                if (visibleCfiRange &&
-                    visibleCfiRange.firstVisibleCfi &&
-                    visibleCfiRange.firstVisibleCfi.contentCFI &&
-                    visibleCfiRange.lastVisibleCfi &&
-                    visibleCfiRange.lastVisibleCfi.contentCFI) {
-
-                    visible = that._cfiIsBetweenTwoCfis(
-                        highlightGroup.CFI,
-                        visibleCfiRange.firstVisibleCfi.contentCFI,
-                        visibleCfiRange.lastVisibleCfi.contentCFI);
-                }
-                highlightGroup.visible = visible;
-                highlightGroup.resetHighlights(that.readerBoundElement,
-                    isVerticalWritingMode ? leftAddition : 0,
-                    isVerticalWritingMode ? 0 : leftAddition
-                    );
-
-            });
-        },
-
-        getHighlight: function(id) {
-            var highlight = this.annotationHash[id];
-            if (highlight) {
-                return highlight.toInfo();
-            } else {
-                return undefined;
-            }
-        },
-
-        getHighlights: function() {
-            var highlights = [];
-            _.each(this.highlights, function(highlight) {
-                highlights.push(highlight.toInfo());
-            });
-            return highlights;
-        },
-
-        removeHighlight: function(annotationId) {
-            var annotationHash = this.annotationHash;
-            var highlights = this.highlights;
-
-            delete annotationHash[annotationId];
-
-            highlights = _.reject(highlights, function(highlightGroup) {
-                if (highlightGroup.id == annotationId) {
-                    highlightGroup.destroyCurrentHighlights();
-                    return true;
-                } else {
-                    return false;
-                }
-            });
-
-            this.highlights = highlights;
-        },
-
-        removeHighlightsByType: function(type) {
-            var annotationHash = this.annotationHash;
-            var highlights = this.highlights;
-
-            // the returned list only contains HLs for which the function returns false
-            highlights = _.reject(highlights, function(highlightGroup) {
-                if (highlightGroup.type === type) {
-                    delete annotationHash[highlightGroup.id];
-                    highlightGroup.destroyCurrentHighlights();
-                    return true;
-                } else {
-                    return false;
-                }
-            });
-
-            this.highlights = highlights;
-        },
-
-        // generate unique prefix for HL ids
-        generateIdPrefix: function() {
-            var idPrefix = 'xxxxxxxx'.replace(/[x]/g, function(c) {
-                var r = Math.random() * 16 | 0;
-                return r.toString(16);
-            });
-            idPrefix += "_";
-            return idPrefix;
-        },
-
-
-        // takes partial CFI as parameter
-        addHighlight: function(CFI, id, type, styles) {
-            var CFIRangeInfo;
-            var range;
-            var rangeStartNode;
-            var rangeEndNode;
-            var selectedElements;
-            var leftAddition;
-
-            var contentDoc = this.context.document;
-            //get transform scale of content document
-            var scale = 1.0;
-            var matrix = HighlightHelpers.getMatrix($('html', contentDoc));
-            if (matrix) {
-                scale = HighlightHelpers.getScaleFromMatrix(matrix);
-            }
-
-            //create a dummy test div to determine if the browser provides
-            // client rectangles that take transform scaling into consideration
-            var $div = $('<div style="font-size: 50px; position: absolute; background: red; top:-9001px;">##</div>');
-            $(contentDoc.documentElement).append($div);
-            range = contentDoc.createRange();
-            range.selectNode($div[0]);
-            var renderedWidth = this._normalizeRectangle(range.getBoundingClientRect()).width;
-            var clientWidth = $div[0].clientWidth;
-            $div.remove();
-            var renderedVsClientWidthFactor = renderedWidth / clientWidth;
-            if (renderedVsClientWidthFactor === 1) {
-                //browser doesn't provide scaled client rectangles (firefox)
-                scale = 1;
-            } else if (this.context.isIe9 || this.context.isIe10) {
-                //use the test scale factor as our scale value for IE 9/10
-                scale = renderedVsClientWidthFactor;
-            }
-            this.scale = scale;
-
-            // form fake full CFI to satisfy getRangeTargetNodes
-            var arbitraryPackageDocCFI = "/99!"
-            var fullFakeCFI = "epubcfi(" + arbitraryPackageDocCFI + CFI + ")";
-            if (this.epubCFI.Interpreter.isRangeCfi(fullFakeCFI)) {
-                CFIRangeInfo = this.epubCFI.getRangeTargetElements(fullFakeCFI, contentDoc, ["cfi-marker", "cfi-blacklist", "mo-cfi-highlight"], [], ["MathJax_Message", "MathJax_SVG_Hidden"]);
-
-                var startNode = CFIRangeInfo.startElement,
-                    endNode = CFIRangeInfo.endElement;
-                range = rangy.createRange(contentDoc);
-                if (startNode.length < CFIRangeInfo.startOffset) {
-                    //this is a workaround
-                    // "Uncaught IndexSizeError: Index or size was negative, or greater than the allowed value." errors
-                    // the range cfi generator outputs a cfi like /4/2,/1:125,/16
-                    // can't explain, investigating..
-                    CFIRangeInfo.startOffset = startNode.length;
-                }
-                range.setStart(startNode, CFIRangeInfo.startOffset);
-                range.setEnd(endNode, CFIRangeInfo.endOffset);
-                selectedElements = range.getNodes();
-            } else {
-                var element = this.epubCFI.getTargetElement(fullFakeCFI, contentDoc, ["cfi-marker", "cfi-blacklist", "mo-cfi-highlight"], [], ["MathJax_Message", "MathJax_SVG_Hidden"]);
-                selectedElements = [element ? element[0] : null];
-                range = null;
-            }
-
-            leftAddition = -this._getPaginationLeftOffset();
-
-            var isVerticalWritingMode = this.context.paginationInfo().isVerticalWritingMode;
-
-            this._addHighlightHelper(
-                CFI, id, type, styles, selectedElements, range,
-                startNode, endNode,
-                isVerticalWritingMode ? leftAddition : 0,
-                isVerticalWritingMode ? 0 : leftAddition
-                );
-
-            return {
-                selectedElements: selectedElements,
-                CFI: CFI
-            };
-        },
-
-
-        // this returns a partial CFI only!!
-        getCurrentSelectionCFI: function() {
-            var currentSelection = this._getCurrentSelectionRange();
-            var CFI;
-            if (currentSelection) {
-                selectionInfo = this._getSelectionInfo(currentSelection);
-                CFI = selectionInfo.CFI;
-            }
-
-            return CFI;
-        },
-
-        // this returns a partial CFI only!!
-        getCurrentSelectionOffsetCFI: function() {
-            var currentSelection = this._getCurrentSelectionRange();
-
-            var CFI;
-            if (currentSelection) {
-                CFI = this._generateCharOffsetCFI(currentSelection);
-            }
-            return CFI;
-        },
-
-        addSelectionHighlight: function(id, type, styles, clearSelection) {
-            var CFI = this.getCurrentSelectionCFI();
-            if (CFI) {
-
-                // if clearSelection is true
-                if (clearSelection) {
-                    var iframeDocument = this.context.document;
-                    if (iframeDocument.getSelection) {
-                        var currentSelection = iframeDocument.getSelection();
-                        currentSelection.collapseToStart();
-                    }
-                }
-                return this.addHighlight(CFI, id, type, styles);
-            } else {
-                throw new Error("Nothing selected");
-            }
-        },
-
-        updateAnnotation: function(id, type, styles) {
-            var annotationViews = this.annotationHash[id];
-            if (annotationViews) {
-                annotationViews.update(type, styles);
-            }
-            return annotationViews;
-        },
-
-        replaceAnnotation: function(id, cfi, type, styles) {
-            var annotationViews = this.annotationHash[id];
-            if (annotationViews) {
-                // remove an existing annotatio
-                this.removeHighlight(id);
-
-                // create a new HL
-                this.addHighlight(cfi, id, type, styles);
-            }
-            return annotationViews;
-        },
-
-        updateAnnotationView: function(id, styles) {
-            var annotationViews = this.annotationHash[id];
-            if (annotationViews) {
-                annotationViews.setStyles(styles);
-            }
-            return annotationViews;
-        },
-
-        setAnnotationViewState: function(id, state, value) {
-            var annotationViews = this.annotationHash[id];
-            if (annotationViews) {
-                annotationViews.setState(state, value);
-            }
-            return annotationViews;
-        },
-
-        setAnnotationViewStateForAll: function(state, value) {
-            var annotationViews = this.annotationHash;
-            _.each(annotationViews, function(annotationView) {
-                annotationView.setState(state, value);
-            });
-        },
-
-        // ------------------------------------------------------------------------------------ //
-        //  "PRIVATE" HELPERS                                                                   //
-        // ------------------------------------------------------------------------------------ //
-
-
-
-        //return an array of all numbers in the content cfi
-        _parseContentCfi: function(cont) {
-            return cont.replace(/\[(.*?)\]/, "").split(/[\/,:]/).map(function(n) {
-                return parseInt(n);
-            }).filter(Boolean);
-        },
-
-        _contentCfiComparator: function(cont1, cont2) {
-            cont1 = this._parseContentCfi(cont1);
-            cont2 = this._parseContentCfi(cont2);
-
-            //compare cont arrays looking for differences
-            for (var i = 0; i < cont1.length; i++) {
-                if (cont1[i] > cont2[i]) {
-                    return 1;
-                } else if (cont1[i] < cont2[i]) {
-                    return -1;
-                }
-            }
-
-            //no differences found, so confirm that cont2 did not have values we didn't check
-            if (cont1.length < cont2.length) {
-                return -1;
-            }
-
-            //cont arrays are identical
-            return 0;
-        },
-
-        // determine if a given Cfi falls between two other cfis.2
-        _cfiIsBetweenTwoCfis: function(cfi, firstVisibleCfi, lastVisibleCfi) {
-            if (!firstVisibleCfi || !lastVisibleCfi) {
-                return null;
-            }
-            var first = this._contentCfiComparator(cfi, firstVisibleCfi);
-            var second = this._contentCfiComparator(cfi, lastVisibleCfi);
-            return first >= 0 && second <= 0;
-        },
-
-        _addHighlightHelper: function(CFI, annotationId, type, styles, highlightedNodes,
-            range, startNode, endNode, offsetTop, offsetLeft) {
-            if (!offsetTop) {
-                offsetTop = this.offsetTopAddition;
-            }
-            if (!offsetLeft) {
-                offsetLeft = this.offsetLeftAddition;
-            }
-
-            var visible;
-            // check if the options specify lastVisibleCfi/firstVisibleCfi. If they don't fall back to displaying the highlights anyway.
-            var visibleCfiRange = this.getVisibleCfiRange();
-            if (visibleCfiRange &&
-                visibleCfiRange.firstVisibleCfi &&
-                visibleCfiRange.firstVisibleCfi.contentCFI &&
-                visibleCfiRange.lastVisibleCfi &&
-                visibleCfiRange.lastVisibleCfi.contentCFI) {
-                visible = this._cfiIsBetweenTwoCfis(CFI, visibleCfiRange.firstVisibleCfi.contentCFI, visibleCfiRange.lastVisibleCfi.contentCFI);
-            } else {
-                visible = true;
-            }
-
-            annotationId = annotationId.toString();
-            if (this.annotationHash[annotationId]) {
-                throw new Error("That annotation id already exists; annotation not added");
-            }
-
-            var highlightGroup = new HighlightGroup(this.context, {
-                CFI: CFI,
-                selectedNodes: highlightedNodes,
-                offsetTopAddition: offsetTop,
-                offsetLeftAddition: offsetLeft,
-                styles: styles,
-                id: annotationId,
-                type: type,
-                scale: this.scale,
-                selectionText: range ? range.toString() : "",
-                visible: visible,
-                rangeInfo: range ? {
-                    startNode: startNode,
-                    startOffset: range.startOffset,
-                    endNode: endNode,
-                    endOffset: range.endOffset
-                } : null
-            });
-
-            this.annotationHash[annotationId] = highlightGroup;
-            this.highlights.push(highlightGroup);
-
-
-            highlightGroup.renderHighlights(this.readerBoundElement);
-        },
-
-        _normalizeRectangle: function(rect) {
-            return {
-                left: rect.left,
-                right: rect.right,
-                top: rect.top,
-                bottom: rect.bottom,
-                width: rect.right - rect.left,
-                height: rect.bottom - rect.top
-            };
-        },
-
-        _getSelectionInfo: function(selectedRange, elementType) {
-            // Generate CFI for selected text
-            var CFI = this._generateRangeCFI(selectedRange);
-            var intervalState = {
-                startElementFound: false,
-                endElementFound: false
-            };
-            var selectedElements = [];
-
-            if (!elementType) {
-                var elementType = ["text"];
-            }
-
-            this._findSelectedElements(
-                selectedRange.commonAncestorContainer,
-                selectedRange.startContainer,
-                selectedRange.endContainer,
-                intervalState,
-                selectedElements,
-                elementType
-            );
-
-            // Return a list of selected text nodes and the CFI
-            return {
-                CFI: CFI,
-                selectedElements: selectedElements
-            };
-        },
-
-        _generateRangeCFI: function(selectedRange) {
-            var startNode = selectedRange.startContainer;
-            var endNode = selectedRange.endContainer;
-            var commonAncestor = selectedRange.commonAncestorContainer;
-            var startOffset;
-            var endOffset;
-            var rangeCFIComponent;
-
-            startOffset = selectedRange.startOffset;
-            endOffset = selectedRange.endOffset;
-
-            rangeCFIComponent = this.epubCFI.generateRangeComponent(
-                startNode,
-                startOffset,
-                endNode,
-                endOffset, ["cfi-marker", "cfi-blacklist", "mo-cfi-highlight"], [], ["MathJax_Message", "MathJax_SVG_Hidden"]
-            );
-            return rangeCFIComponent;
-        },
-
-        _generateCharOffsetCFI: function(selectedRange) {
-            // Character offset
-            var startNode = selectedRange.startContainer;
-            var startOffset = selectedRange.startOffset;
-            var charOffsetCFI;
-
-            if (startNode.nodeType === Node.TEXT_NODE) {
-                charOffsetCFI = this.epubCFI.generateCharacterOffsetCFIComponent(
-                    startNode,
-                    startOffset, ["cfi-marker", "cfi-blacklist", "mo-cfi-highlight"], [], ["MathJax_Message", "MathJax_SVG_Hidden"]
-                );
-            }
-            return charOffsetCFI;
-        },
-
-        // REFACTORING CANDIDATE: Convert this to jquery
-        _findSelectedElements: function(
-            currElement, startElement, endElement, intervalState, selectedElements, elementTypes) {
-
-            if (currElement === startElement) {
-                intervalState.startElementFound = true;
-            }
-
-            if (intervalState.startElementFound === true) {
-                this._addElement(currElement, selectedElements, elementTypes);
-            }
-
-            if (currElement === endElement) {
-                intervalState.endElementFound = true;
-                return;
-            }
-
-            if (currElement.firstChild) {
-                this._findSelectedElements(currElement.firstChild, startElement, endElement,
-                    intervalState, selectedElements, elementTypes);
-                if (intervalState.endElementFound) {
-                    return;
-                }
-            }
-
-            if (currElement.nextSibling) {
-                this._findSelectedElements(currElement.nextSibling, startElement, endElement,
-                    intervalState, selectedElements, elementTypes);
-                if (intervalState.endElementFound) {
-                    return;
-                }
-            }
-        },
-
-        _addElement: function(currElement, selectedElements, elementTypes) {
-            // Check if the node is one of the types
-            _.each(elementTypes, function(elementType) {
-
-                if (elementType === "text") {
-                    if (currElement.nodeType === Node.TEXT_NODE) {
-                        selectedElements.push(currElement);
-                    }
-                } else {
-                    if ($(currElement).is(elementType)) {
-                        selectedElements.push(currElement);
-                    }
-                }
-            });
-        },
-
-        // Rationale: This is a cross-browser method to get the currently selected text
-        _getCurrentSelectionRange: function() {
-            var currentSelection;
-            var iframeDocument = this.context.document;
-            if (iframeDocument.getSelection) {
-
-                currentSelection = iframeDocument.getSelection();
-                if (!currentSelection || currentSelection.rangeCount === 0) {
-                    return undefined;
-                }
-
-                var range = currentSelection.getRangeAt(0);
-
-                if (range.toString() !== '') {
-                    return range;
-                } else {
-                    return undefined;
-                }
-            } else if (iframeDocument.selection) {
-                return iframeDocument.selection.createRange();
-            } else {
-                return undefined;
-            }
-        },
-
-        _getPaginationLeftOffset: function() {
-        
-            var $htmlElement = $(this.context.document.documentElement);
-            if (!$htmlElement || !$htmlElement.length) {
-                // if there is no html element, we might be dealing with a fxl with a svg spine item
-                return 0;
-            }
-
-            var offsetLeftPixels = $htmlElement.css(this.context.paginationInfo().isVerticalWritingMode ? "top" : (this.context.isRTL ? "right" : "left"));
-            var offsetLeft = parseInt(offsetLeftPixels.replace("px", ""));
-            if (isNaN(offsetLeft)) {
-                //for fixed layouts, $htmlElement.css("left") has no numerical value
-                offsetLeft = 0;
-            }
-            
-            if (this.context.isRTL && !this.context.paginationInfo().isVerticalWritingMode) return -offsetLeft;
-             
-            return offsetLeft;
-        },
-
-        _injectAnnotationCSS: function(annotationCSSUrl) {
-            var doc = this.context.document;
-            setTimeout(function(){
-                var $contentDocHead = $("head", doc);
-                $contentDocHead.append(
-                    $("<link/>", {
-                        rel: "stylesheet",
-                        href: annotationCSSUrl,
-                        type: "text/css"
-                    })
-                );
-            }, 0);
-        }
-    });
-
-    return HighlightsController;
-});
-
-//  Created by Boris Schneiderman.
-//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
-//  
-//  Redistribution and use in source and binary forms, with or without modification, 
-//  are permitted provided that the following conditions are met:
-//  1. Redistributions of source code must retain the above copyright notice, this 
-//  list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright notice, 
-//  this list of conditions and the following disclaimer in the documentation and/or 
-//  other materials provided with the distribution.
-//  3. Neither the name of the organization nor the names of its contributors may be 
-//  used to endorse or promote products derived from this software without specific 
-//  prior written permission.
-//  
-//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
-//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
-//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
-//  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
-//  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
-//  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
-//  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
-//  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
-//  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
-//  OF THE POSSIBILITY OF SUCH DAMAGE.
-
-define('readium_shared_js/models/bookmark_data',[],function() {
-/**
- * @class Models.BookmarkData
- */
-var BookmarkData = function(idref, contentCFI) {
-
-    var self = this;
-
-    /**
-     * spine item idref
-     * @property idref
-     * @type {string}
-     */
-
-    this.idref = idref;
-
-    /**
-     * cfi of the first visible element
-     * @property contentCFI
-     * @type {string}
-     */
-    
-    this.contentCFI = contentCFI;
-
-    /**
-     * serialize to string
-     * @return JSON string representation
-     */
-    
-    this.toString = function(){
-        return JSON.stringify(self);
-    }
-
-};
-
-/**
- * Deserialize from string
- * @param str
- * @returns {ReadiumSDK.Models.BookmarkData}
- */
-BookmarkData.fromString = function(str) {
-    var obj = JSON.parse(str);
-    return new BookmarkData(obj.idref,obj.contentCFI);
-};
-return BookmarkData;
-});
-//  Created by Dmitry Markushevich (dmitrym@evidentpoint.com)
-//
-//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
-//
-//  Redistribution and use in source and binary forms, with or without modification,
-//  are permitted provided that the following conditions are met:
-//  1. Redistributions of source code must retain the above copyright notice, this
-//  list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright notice,
-//  this list of conditions and the following disclaimer in the documentation and/or
-//  other materials provided with the distribution.
-//  3. Neither the name of the organization nor the names of its contributors may be
-//  used to endorse or promote products derived from this software without specific
-//  prior written permission.
-//
-//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-//  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-//  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-//  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-//  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-//  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
-//  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
-//  OF THE POSSIBILITY OF SUCH DAMAGE.
-
-define('readium_plugin_highlights/manager',['jquery', 'underscore', 'eventEmitter', './controller', './helpers', 'readium_shared_js/models/bookmark_data'], function($, _, EventEmitter, HighlightsController, HighlightHelpers, BookmarkData) {
-
-var defaultContext = {};
-
-//determine if browser is IE9 or IE10
-var div = document.createElement("div");
-div.innerHTML = "<!--[if IE 9]><i></i><![endif]-->";
-defaultContext.isIe9 = (div.getElementsByTagName("i").length == 1);
-// IE10 introduced a prefixed version of PointerEvent, but not unprefixed.
-defaultContext.isIe10 = window.MSPointerEvent && !window.PointerEvent;
-
-/**
- *
- * @param proxyObj
- * @param options
- * @constructor
- */
-var HighlightsManager = function (proxyObj, options) {
-
-    var self = this;
-
-    // live annotations contains references to the annotation _module_ for visible spines
-    var liveAnnotations = {};
-    var spines = {};
-    var proxy = proxyObj;
-    var annotationCSSUrl = options.annotationCSSUrl;
-
-    if (!annotationCSSUrl) {
-        console.warn("WARNING! Annotations CSS not supplied. Highlighting might not work.");
-    }
-
-    _.extend(this, new EventEmitter());
-
-    // this.on("all", function() {
-    // });
-    //TODO: EventEmitter3 does not support "all" or "*" (catch-all event sink)
-    //https://github.com/primus/eventemitter3/blob/master/index.js#L61
-    //...so instead we patch trigger() and emit() (which are synonymous, see Bootstrapper.js EventEmitter.prototype.trigger = EventEmitter.prototype.emit;)
-
-    var originalEmit = self['emit'];
-
-    var triggerEmitPatch = function() {
-        var args = Array.prototype.slice.call(arguments);
-        // mangle annotationClicked event. What really needs to happen is, the annotation_module needs to return a
-        // bare Cfi, and this class should append the idref.
-        var mangleEvent = function(annotationEvent){
-            if (args.length && args[0] === annotationEvent) {
-                for (var spineIndex in liveAnnotations)
-                {
-                    var contentDocumentFrame = args[5];
-                    var jQueryEvent = args[4];
-                    if (typeof jQueryEvent.clientX === 'undefined') {
-                        jQueryEvent.clientX = jQueryEvent.pageX;
-                        jQueryEvent.clientY = jQueryEvent.pageY;
-                    }
-
-                    var annotationId = args[3];
-                    var partialCfi = args[2];
-                    var type = args[1];
-                    if (liveAnnotations[spineIndex].getHighlight(annotationId)) {
-                        var idref = spines[spineIndex].idref;
-                        args = [annotationEvent, type, idref, partialCfi, annotationId, jQueryEvent, contentDocumentFrame];
-                    }
-                }
-            }
-        }
-        mangleEvent('annotationClicked');
-        mangleEvent('annotationTouched');
-        mangleEvent('annotationRightClicked');
-        mangleEvent('annotationHoverIn');
-        mangleEvent('annotationHoverOut');
-
-        originalEmit.apply(self, args);
-        originalEmit.apply(proxy, args);
-    };
-
-    this.trigger = triggerEmitPatch;
-    this.emit = triggerEmitPatch;
-
-    this.attachAnnotations = function($iframe, spineItem, loadedSpineItems) {
-        var iframe = $iframe[0];
-
-        var context = _.extend({
-            document: iframe.contentDocument,
-            window: iframe.contentWindow,
-            iframe: iframe,
-            manager: self,
-            cssUrl: annotationCSSUrl,
-            isFixedLayout: spineItem.isFixedLayout(),
-            isRTL: spineItem.spine.isRightToLeft(),
-            paginationInfo: function() { return spineItem.paginationInfo; }
-            
-        }, defaultContext);
-
-        liveAnnotations[spineItem.index] = new HighlightsController(context, {getVisibleCfiRangeFn: options.getVisibleCfiRangeFn});
-        spines[spineItem.index] = spineItem;
-
-        // check to see which spine indicies can be culled depending on the currently loaded spine items
-        for(var spineIndex in liveAnnotations) {
-            if (liveAnnotations.hasOwnProperty(spineIndex) && !_.contains(loadedSpineItems, spines[spineIndex])) {
-                delete liveAnnotations[spineIndex];
-            }
-        }
-    };
-
-    this.getCurrentSelectionCfi = function() {
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            var partialCfi = annotationsForView.getCurrentSelectionCFI();
-            if (partialCfi) {
-                return {"idref":spines[spine].idref, "cfi":partialCfi};
-            }
-        }
-        return undefined;
-    };
-
-    this.addSelectionHighlight = function(id, type, styles, clearSelection) {
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            if (annotationsForView.getCurrentSelectionCFI()) {
-                var annotation = annotationsForView.addSelectionHighlight(
-                    id, type, styles, clearSelection);
-                return new BookmarkData(spines[spine].idref, annotation.CFI);
-            }
-        }
-        return undefined;
-    };
-
-    this.addHighlight = function(spineIdRef, partialCfi, id, type, styles) {
-        for(var spine in liveAnnotations) {
-            if (spines[spine].idref === spineIdRef) {
-                var annotationsForView = liveAnnotations[spine];
-                var annotation = annotationsForView.addHighlight(partialCfi, id, type, styles);
-                if (annotation) {
-                    return new BookmarkData(spineIdRef, annotation.CFI);
-                }
-            }
-        }
-        return undefined;
-    };
-
-    this.removeHighlight = function(id) {
-        var result = undefined;
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            result  = annotationsForView.removeHighlight(id);
-        }
-        return result;
-    };
-
-    this.removeHighlightsByType = function(type) {
-        var result = undefined;
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            result  = annotationsForView.removeHighlightsByType(type);
-        }
-        return result;
-    };
-
-    this.getHighlight = function(id) {
-        var result = undefined;
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            result  = annotationsForView.getHighlight(id);
-            if (result !== undefined)
-				return result;
-        }
-        return result;
-    };
-
-    this.updateAnnotation = function(id, type, styles) {
-        var result = undefined;
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            result = annotationsForView.updateAnnotation(id, type, styles);
-            if(result) {
-                break;
-            }
-        }
-        return result;
-    };
-
-    this.replaceAnnotation = function(id, cfi, type, styles) {
-        var result = undefined;
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            result = annotationsForView.replaceAnnotation(id, cfi, type, styles);
-            if(result) {
-                break;
-            }
-        }
-        return result;
-    };
-
-    // redraw gets called on pagination change, so for progressive rendering we may have to add annotations that were previously not visible.
-    this.redrawAnnotations = function(){
-        for(var spine in liveAnnotations) {
-            liveAnnotations[spine].redraw();
-        }
-    };
-
-    this.updateAnnotationView = function(id, styles) {
-        var result = undefined;
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            result = annotationsForView.updateAnnotationView(id,styles);
-            if(result){
-                break;
-            }
-        }
-        return result;
-    };
-
-    this.setAnnotationViewState = function(id, state, value) {
-        var result = undefined;
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            result = annotationsForView.setAnnotationViewState(id, state, value);
-            if(result){
-                break;
-            }
-        }
-        return result;
-    };
-
-    this.setAnnotationViewStateForAll = function(state, value) {
-        var result = undefined;
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            result = annotationsForView.setAnnotationViewStateForAll(state, value);
-            if(result){
-                break;
-            }
-        }
-        return result;
-    };
-
-    this.cfiIsBetweenTwoCfis = function (cfi, lowBoundaryCfi, highBoundaryCfi) {
-        var result = undefined;
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            result = annotationsForView.cfiIsBetweenTwoCfis(cfi, lowBoundaryCfi, highBoundaryCfi);
-            if(result){
-                break;
-            }
-        }
-        return result;
-    };
-
-    this.contentCfiComparator = function(contCfi1, contCfi2) {
-        var result = undefined;
-        for(var spine in liveAnnotations) {
-            var annotationsForView = liveAnnotations[spine];
-            result = annotationsForView.contentCfiComparator(contCfi1, contCfi2);
-            if(result){
-                break;
-            }
-        }
-        return result;
-    };
-
-    function getElementFromViewElement(element) {
-        //TODO JC: yuck, we get two different collection structures from non fixed and fixed views.. must refactor..
-        return element.element ? element.element : element;
-    }
-
-    this.getAnnotationMidpoints = function($elementSpineItemCollection){
-        var output = [];
-
-        _.each($elementSpineItemCollection, function (item){
-            var annotations = [];
-
-            var lastId = null;
-
-            var baseOffset = {top: 0, left: 0};
-            if (item.elements && item.elements.length > 0) {
-                var firstElement = getElementFromViewElement(item.elements[0]);
-                var offsetElement = firstElement.ownerDocument.defaultView.frameElement.parentElement;
-                baseOffset = {top: offsetElement.offsetTop, left: offsetElement.offsetLeft};
-            }
-
-            _.each(item.elements, function(element){
-
-                var $element = $(getElementFromViewElement(element));
-                var elementId = $element.attr('data-id');
-
-                if(!elementId){
-                    console.warn('AnnotationsManager:getAnnotationMidpoints: Got an annotation element with no ID??')
-                    return;
-                }
-                if (elementId === lastId) return;
-                lastId = elementId;
-
-                //calculate position offsets with scaling
-                var scale = 1;
-                //figure out a better way to get the html parent from an element..
-                var $html = $element.parent();
-                //get transformation scale from content document
-                var matrix = HighlightHelpers.getMatrix($html);
-                if (matrix) {
-                    scale = HighlightHelpers.getScaleFromMatrix(matrix);
-                }
-                var offset = $element.offset();
-                offset.top += baseOffset.top + ($element.height() / 2);
-                offset.left += baseOffset.left;
-                if(scale !== 1){
-                    offset = {top: (offset.top * scale)*(1/scale), left: offset.left };
-                }
-                var $highlighted = {id: elementId, position: offset, lineHeight: parseInt($element.css('line-height'),10)};
-                annotations.push($highlighted)
-            });
-
-            output.push({annotations:annotations, spineItem: item.spineItem});
-        });
-
-        return output;
-    };
-
-    this.getAnnotationsElementSelector = function () {
-        return 'div.rd-highlight, div.rd-highlight-border';
-    };
-
-};
-
-return HighlightsManager;
-});
-
-define('readium_plugin_highlights/main',['readium_js_plugins', 'readium_shared_js/globals', './manager'], function (Plugins, Globals, HighlightsManager) {
-    var config = {};
-
-    Plugins.register("highlights", function (api) {
-        var reader = api.reader, _highlightsManager, _initialized = false, _initializedLate = false;
-
-        var self = this;
-
-        function isInitialized() {
-            if (!_initialized) {
-                api.plugin.warn('Not initialized!')
-            }
-            return _initialized;
-        }
-
-        this.initialize = function (options) {
-            options = options || {};
-
-            setTimeout(isInitialized, 1000);
-
-            if (_initialized) {
-                api.plugin.warn('Already initialized!');
-                return;
-            }
-
-            if (reader.getFirstVisibleCfi && reader.getLastVisibleCfi && !options.getVisibleCfiRangeFn) {
-                options.getVisibleCfiRangeFn = function () {
-                    return {firstVisibleCfi: reader.getFirstVisibleCfi(), lastVisibleCfi: reader.getLastVisibleCfi()};
-                };
-            }
-
-            _highlightsManager = new HighlightsManager(self, options);
-
-            if (_initializedLate) {
-                api.plugin.warn('Unable to attach to currently loaded content document.\n' +
-                'Initialize the plugin before loading a content document.');
-            }
-
-            _initialized = true;
-        };
-
-        this.getHighlightsManager = function() {
-            return _highlightsManager;
-        };
-
-        /**
-         * Returns current selection partial Cfi, useful for workflows that need to check whether the user has selected something.
-         *
-         * @returns {object | undefined} partial cfi object or undefined if nothing is selected
-         */
-        this.getCurrentSelectionCfi = function() {
-            return _highlightsManager.getCurrentSelectionCfi();
-        };
-
-        /**
-         * Creates a higlight based on given parameters
-         *
-         * @param {string} spineIdRef		Spine idref that defines the partial Cfi
-         * @param {string} cfi				Partial CFI (withouth the indirection step) relative to the spine index
-         * @param {string} id				Id of the highlight. must be unique
-         * @param {string} type 			Name of the class selector rule in annotations stylesheet.
-         * 									The style of the class will be applied to the created hightlight
-         * @param {object} styles			Object representing CSS properties to be applied to the highlight.
-         * 									e.g., to apply background color pass in: {'background-color': 'green'}
-         *
-         * @returns {object | undefined} partial cfi object of the created highlight
-         */
-        this.addHighlight = function(spineIdRef, cfi, id, type, styles) {
-            return _highlightsManager.addHighlight(spineIdRef, cfi, id, type, styles);
-        };
-
-        /**
-         * Creates a higlight based on the current selection
-         *
-         * @param {string} id id of the highlight. must be unique
-         * @param {string} type - name of the class selector rule in annotations.css file.
-         * @param {object} styles - object representing CSS properties to be applied to the highlight.
-         * e.g., to apply background color pass this {'background-color': 'green'}
-         * @param {boolean} clearSelection - set to true to clear the current selection
-         * after it is highlighted
-         *
-         * @returns {object | undefined} partial cfi object of the created highlight
-         */
-        this.addSelectionHighlight =  function(id, type, styles, clearSelection) {
-            return _highlightsManager.addSelectionHighlight(id, type, styles, clearSelection);
-        };
-
-        /**
-         * Removes a given highlight
-         *
-         * @param {string} id  The id associated with the highlight.
-         *
-         * @returns {undefined}
-         *
-         */
-        this.removeHighlight = function(id) {
-            return _highlightsManager.removeHighlight(id);
-        };
-
-        /**
-         * Removes highlights of a given type
-         *
-         * @param {string} type type of the highlight.
-         *
-         * @returns {undefined}
-         *
-         */
-        this.removeHighlightsByType = function(type) {
-            return _highlightsManager.removeHighlightsByType(type);
-        };
-
-        /**
-         * Client Rectangle
-         * @typedef {object} ReadiumSDK.Views.ReaderView.ClientRect
-         * @property {number} top
-         * @property {number} left
-         * @property {number} height
-         * @property {number} width
-         */
-
-        /**
-         * Highlight Info
-         *
-         * @typedef {object} ReadiumSDK.Views.ReaderView.HighlightInfo
-         * @property {string} id - unique id of the highlight
-         * @property {string} type - highlight type (css class)
-         * @property {string} CFI - partial CFI range of the highlight
-         * @property {ReadiumSDK.Views.ReaderView.ClientRect[]} rectangleArray - array of rectangles consituting the highlight
-         * @property {string} selectedText - concatenation of highlight nodes' text
-         */
-
-        /**
-         * Gets given highlight
-         *
-         * @param {string} id id of the highlight.
-         *
-         * @returns {ReadiumSDK.Views.ReaderView.HighlightInfo} Object describing the highlight
-         */
-        this.getHighlight = function(id) {
-            return _highlightsManager.getHighlight(id);
-        };
-
-        /**
-         * Update annotation by the id, reapplies CSS styles to the existing annotaion
-         *
-         * @param {string} id id of the annotation.
-         * @property {string} type - annotation type (name of css class)
-         * @param {object} styles - object representing CSS properties to be applied to the annotation.
-         * e.g., to apply background color pass this {'background-color': 'green'}.
-         */
-        this.updateAnnotation = function(id, type, styles) {
-            _highlightsManager.updateAnnotation(id, type, styles);
-        };
-
-        /**
-         * Replace annotation with this id. Current annotation is removed and a new one is created.
-         *
-         * @param {string} id id of the annotation.
-         * @property {string} cfi - partial CFI range of the annotation
-         * @property {string} type - annotation type (name of css class)
-         * @param {object} styles - object representing CSS properties to be applied to the annotation.
-         * e.g., to apply background color pass this {'background-color': 'green'}.
-         */
-        this.replaceAnnotation = function(id, cfi, type, styles) {
-            _highlightsManager.replaceAnnotation(id, cfi, type, styles);
-        };
-
-
-        /**
-         * Redraws all annotations
-         */
-        this.redrawAnnotations = function() {
-            _highlightsManager.redrawAnnotations();
-        };
-
-        /**
-         * Updates an annotation to use the supplied styles
-         *
-         * @param {string} id
-         * @param {string} styles
-         */
-        this.updateAnnotationView = function(id, styles) {
-            _highlightsManager.updateAnnotationView(id, styles);
-        };
-
-        /**
-         * Updates an annotation view state, such as whether its hovered in or not.
-         * @param {string} id       The id associated with the highlight.
-         * @param {string} state    The state type to be updated
-         * @param {string} value    The state value to apply to the highlight
-         * @returns {undefined}
-         */
-        this.setAnnotationViewState = function(id, state, value) {
-            return _highlightsManager.setAnnotationViewState(id, state, value);
-        };
-
-        /**
-         * Updates an annotation view state for all views.
-         * @param {string} state    The state type to be updated
-         * @param {string} value    The state value to apply to the highlights
-         * @returns {undefined}
-         */
-        this.setAnnotationViewStateForAll = function (state, value) {
-            return _highlightsManager.setAnnotationViewStateForAll(state, value);
-        };
-
-        /**
-         * Gets a list of the visible midpoint positions of all annotations
-         *
-         * @returns {HTMLElement[]}
-         */
-        this.getVisibleAnnotationMidpoints = function () {
-            if (reader.getVisibleElements) {
-                var $visibleElements = reader.getVisibleElements(_highlightsManager.getAnnotationsElementSelector(), true);
-
-                var elementMidpoints = _highlightsManager.getAnnotationMidpoints($visibleElements);
-                return elementMidpoints || [];
-            } else {
-                // FIXME: Expose the getVisibleElements call from the reader's internal views.
-                console.warn('getAnnotationMidpoints won\'t work with this version of Readium');
-            }
-        };
-
-        reader.on(Globals.Events.CONTENT_DOCUMENT_LOADED, function ($iframe, spineItem) {
-            if (_initialized) {
-                _highlightsManager.attachAnnotations($iframe, spineItem, reader.getLoadedSpineItems());
-            } else {
-                _initializedLate = true;
-            }
-        });
-
-        ////FIXME: JCCR mj8: this is sometimes faulty, consider removal
-        //// automatically redraw annotations.
-        //reader.on(ReadiumSDK.Events.PAGINATION_CHANGED, _.debounce(function () {
-        //    self.redrawAnnotations();
-        //}, 10, true));
-
-
-
-    });
-
-    return config;
-});
-
-define('readium_plugin_highlights', ['readium_plugin_highlights/main'], function (main) { return main; });
-
 /*
 This code is required to IE for console shim
 */
@@ -19071,7 +16260,7 @@ define("es6-collections", function(){});
  * URI.js - Mutating URLs
  * IPv6 Support
  *
- * Version: 1.18.4
+ * Version: 1.18.10
  *
  * Author: Rodney Rehm
  * Web: http://medialize.github.io/URI.js/
@@ -19257,7 +16446,7 @@ define("es6-collections", function(){});
  * URI.js - Mutating URLs
  * Second Level Domain (SLD) Support
  *
- * Version: 1.18.4
+ * Version: 1.18.10
  *
  * Author: Rodney Rehm
  * Web: http://medialize.github.io/URI.js/
@@ -19428,7 +16617,12 @@ define("es6-collections", function(){});
       'ye':' co com gov ltd me net org plc ',
       'yu':' ac co edu gov org ',
       'za':' ac agric alt bourse city co cybernet db edu gov grondar iaccess imt inca landesign law mil net ngo nis nom olivetti org pix school tm web ',
-      'zm':' ac co com edu gov net org sch '
+      'zm':' ac co com edu gov net org sch ',
+      // https://en.wikipedia.org/wiki/CentralNic#Second-level_domains
+      'com': 'ar br cn de eu gb gr hu jpn kr no qc ru sa se uk us uy za ',
+      'net': 'gb jp se uk ',
+      'org': 'ae',
+      'de': 'com '
     },
     // gorhill 2013-10-25: Using indexOf() instead Regexp(). Significant boost
     // in both performance and memory footprint. No initialization required.
@@ -19497,7 +16691,7 @@ define("es6-collections", function(){});
 /*!
  * URI.js - Mutating URLs
  *
- * Version: 1.18.4
+ * Version: 1.18.10
  *
  * Author: Rodney Rehm
  * Web: http://medialize.github.io/URI.js/
@@ -19573,7 +16767,7 @@ define("es6-collections", function(){});
     return this;
   }
 
-  URI.version = '1.18.4';
+  URI.version = '1.18.10';
 
   var p = URI.prototype;
   var hasOwn = Object.prototype.hasOwnProperty;
@@ -20480,9 +17674,15 @@ define("es6-collections", function(){});
       }
 
       if (parensEnd > -1) {
-        slice = slice.slice(0, parensEnd) + slice.slice(parensEnd + 1).replace(_trim, '');
+        slice = slice.slice(0, parensEnd) + slice.slice(parensEnd).replace(_trim, '');
       } else {
         slice = slice.replace(_trim, '');
+      }
+
+      if (slice.length <= match[0].length) {
+        // the extract only contains the starting marker of a URI,
+        // e.g. "www" or "http://"
+        continue;
       }
 
       if (options.ignore && options.ignore.test(slice)) {
@@ -21067,7 +18267,7 @@ define("es6-collections", function(){});
       return v === undefined ? '' : this;
     }
 
-    if (v === undefined || v === true) {
+    if (typeof v !== 'string') {
       if (!this._parts.path || this._parts.path === '/') {
         return '';
       }
@@ -21591,7 +18791,10 @@ define("es6-collections", function(){});
     //
     // Readium patch >>
 
-    if (!resolved._parts.protocol) {
+    if (resolved._parts.protocol) {
+      // Directly returns even if this._parts.hostname is empty.
+      return resolved;
+    } else {
       resolved._parts.protocol = base._parts.protocol;
     }
 
@@ -21764,6 +18967,193 @@ define("es6-collections", function(){});
   return URI;
 }));
 
+//
+//  Created by Juan Corona
+//  Based on original proposal by Mickaël Menu
+//  Portions adapted from Rangy's Module system: Copyright (c) 2014 Tim Down
+//
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//  1. Redistributions of source code must retain the above copyright notice, this
+//  list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//  this list of conditions and the following disclaimer in the documentation and/or
+//  other materials provided with the distribution.
+//  3. Neither the name of the organization nor the names of its contributors may be
+//  used to endorse or promote products derived from this software without specific
+//  prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+//  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+//  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+//  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+//  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+//  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+//  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+//  OF THE POSSIBILITY OF SUCH DAMAGE.
+
+define('readium_js_plugins',["jquery", "underscore", "eventEmitter"], function ($, _, EventEmitter) {
+
+    var _registeredPlugins = {};
+
+    /**
+     * A  plugins controller used to easily add plugins from the host app, eg.
+     * ReadiumSDK.Plugins.register("footnotes", function(api){ ... });
+     *
+     * @constructor
+     */
+    var PluginsController = function () {
+        var self = this;
+
+
+        this.initialize = function (reader) {
+            var apiFactory = new PluginApiFactory(reader);
+
+            if (!reader.plugins) {
+                //attach an object to the reader that will be
+                // used for plugin namespaces and their extensions
+                reader.plugins = {};
+            } else {
+                throw new Error("Already initialized on reader!");
+            }
+            _.each(_registeredPlugins, function (plugin) {
+                plugin.init(apiFactory);
+            });
+        };
+
+        this.getLoadedPlugins = function() {
+            return _registeredPlugins;
+        };
+
+        // Creates a new instance of the given plugin constructor.
+        this.register = function (name, optDependencies, initFunc) {
+
+            if (_registeredPlugins[name]) {
+                throw new Error("Duplicate registration for plugin with name: " + name);
+            }
+
+            var dependencies;
+            if (typeof optDependencies === 'function') {
+                initFunc = optDependencies;
+            } else {
+                dependencies = optDependencies;
+            }
+
+            _registeredPlugins[name] = new Plugin(name, dependencies, function(plugin, api) {
+                if (!plugin.initialized || !api.host.plugins[plugin.name]) {
+                    plugin.initialized = true;
+                    try {
+                        var pluginContext = {};
+                        $.extend(pluginContext, new EventEmitter());
+
+                        initFunc.call(pluginContext, api.instance);
+                        plugin.supported = true;
+
+                        api.host.plugins[plugin.name] = pluginContext;
+                    } catch (ex) {
+                        plugin.fail(ex);
+                    }
+                }
+            });
+        };
+    };
+
+    function PluginApi(reader, plugin) {
+        this.reader = reader;
+        this.plugin = plugin;
+    }
+
+    function PluginApiFactory(reader) {
+        this.create = function (plugin) {
+            return {
+                host: reader,
+                instance: new PluginApi(reader, plugin)
+            };
+        };
+    }
+
+//
+//  The following is adapted from Rangy's Module class:
+//
+//  Copyright (c) 2014 Tim Down
+//
+//  The MIT License (MIT)
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
+
+    function Plugin(name, dependencies, initializer) {
+        this.name = name;
+        this.dependencies = dependencies;
+        this.initialized = false;
+        this.supported = false;
+        this.initializer = initializer;
+    }
+
+    Plugin.prototype = {
+        init: function (apiFactory) {
+            var requiredPluginNames = this.dependencies || [];
+            for (var i = 0, len = requiredPluginNames.length, requiredPlugin, PluginName; i < len; ++i) {
+                PluginName = requiredPluginNames[i];
+
+                requiredPlugin = _registeredPlugins[PluginName];
+                if (!requiredPlugin || !(requiredPlugin instanceof Plugin)) {
+                    throw new Error("required Plugin '" + PluginName + "' not found");
+                }
+
+                requiredPlugin.init(apiFactory);
+
+                if (!requiredPlugin.supported) {
+                    throw new Error("required Plugin '" + PluginName + "' not supported");
+                }
+            }
+
+            // Now run initializer
+            this.initializer(this, apiFactory.create(this));
+        },
+
+        fail: function (reason) {
+            this.initialized = true;
+            this.supported = false;
+            throw new Error("Plugin '" + this.name + "' failed to load: " + reason);
+        },
+
+        warn: function (msg) {
+            console.warn("Plugin " + this.name + ": " + msg);
+        },
+
+        deprecationNotice: function (deprecated, replacement) {
+            console.warn("DEPRECATED: " + deprecated + " in Plugin " + this.name + "is deprecated. Please use "
+            + replacement + " instead");
+        },
+
+        createError: function (msg) {
+            return new Error("Error in " + this.name + " Plugin: " + msg);
+        }
+    };
+
+    var instance = new PluginsController();
+    return instance;
+});
+
 //  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //
 //  Redistribution and use in source and binary forms, with or without modification,
@@ -21848,6 +19238,77 @@ define('readium_shared_js/globalsSetup',['./globals', 'jquery', 'console_shim', 
 
 define('readium_shared_js', ['readium_shared_js/globalsSetup'], function (main) { return main; });
 
+//  Created by Boris Schneiderman.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
+//  
+//  Redistribution and use in source and binary forms, with or without modification, 
+//  are permitted provided that the following conditions are met:
+//  1. Redistributions of source code must retain the above copyright notice, this 
+//  list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice, 
+//  this list of conditions and the following disclaimer in the documentation and/or 
+//  other materials provided with the distribution.
+//  3. Neither the name of the organization nor the names of its contributors may be 
+//  used to endorse or promote products derived from this software without specific 
+//  prior written permission.
+//  
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
+//  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
+//  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+//  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+//  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+//  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE 
+//  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
+//  OF THE POSSIBILITY OF SUCH DAMAGE.
+
+define('readium_shared_js/models/bookmark_data',[],function() {
+/**
+ * @class Models.BookmarkData
+ */
+var BookmarkData = function(idref, contentCFI) {
+
+    var self = this;
+
+    /**
+     * spine item idref
+     * @property idref
+     * @type {string}
+     */
+
+    this.idref = idref;
+
+    /**
+     * cfi of the first visible element
+     * @property contentCFI
+     * @type {string}
+     */
+    
+    this.contentCFI = contentCFI;
+
+    /**
+     * serialize to string
+     * @return JSON string representation
+     */
+    
+    this.toString = function(){
+        return JSON.stringify(self);
+    }
+
+};
+
+/**
+ * Deserialize from string
+ * @param str
+ * @returns {ReadiumSDK.Models.BookmarkData}
+ */
+BookmarkData.fromString = function(str) {
+    var obj = JSON.parse(str);
+    return new BookmarkData(obj.idref,obj.contentCFI);
+};
+return BookmarkData;
+});
 //  Created by Boris Schneiderman.
 //  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
@@ -23280,6 +20741,10 @@ Helpers.UpdateHtmlFontAttributes = function ($epubHtml, fontSize, fontObj, callb
 
         var factor = fontSize / 100;
         var win = $epubHtml[0].ownerDocument.defaultView;
+        if (!win) {
+            console.log("NIL $epubHtml[0].ownerDocument.defaultView");
+            return;
+        }
 
         // TODO: is this a complete list? Is there a better way to do this?
         //https://github.com/readium/readium-shared-js/issues/336
@@ -24267,6 +21732,16 @@ var CfiNavigationLogic = function(options) {
                 left: 0
             };
         }
+        
+        // CAUSES REGRESSION BUGS !! TODO FIXME
+        // https://github.com/readium/readium-shared-js/issues/384#issuecomment-305145129
+        // else {
+        //     return {
+        //         top: 0,
+        //         left: (options.paginationInfo ? options.paginationInfo.pageOffset : 0)
+        //         //* (isPageProgressionRightToLeft() ? -1 : 1)
+        //     };
+        // }
 
         return {
             top: 0,
@@ -24349,6 +21824,26 @@ var CfiNavigationLogic = function(options) {
     function findPageByRectangles($element, spatialVerticalOffset) {
 
         var visibleContentOffsets = getVisibleContentOffsets();
+        //////////////////////
+        // ABOVE CAUSES REGRESSION BUGS !! TODO FIXME
+        // https://github.com/readium/readium-shared-js/issues/384#issuecomment-305145129
+        if (options.visibleContentOffsets) {
+            visibleContentOffsets = options.visibleContentOffsets();
+        }
+        if (isVerticalWritingMode()) {
+            visibleContentOffsets = {
+                top: (options.paginationInfo ? options.paginationInfo.pageOffset : 0),
+                left: 0
+            };
+        }
+        else { // THIS IS ENABLED ONLY FOR findPageByRectangles(), to fix the pageIndex computation. TODO FIXME!
+            visibleContentOffsets = {
+                top: 0,
+                left: (options.paginationInfo ? options.paginationInfo.pageOffset : 0)
+                //* (isPageProgressionRightToLeft() ? -1 : 1)
+            };
+        }
+        //////////////////////
 
         var clientRectangles = getNormalizedRectangles($element, visibleContentOffsets);
         if (clientRectangles.length === 0) { // elements with display:none, etc.
@@ -25344,15 +22839,16 @@ var CfiNavigationLogic = function(options) {
         var visibleElements = [];
 
         _.each($elements, function ($node) {
-            var isTextNode = ($node[0].nodeType === Node.TEXT_NODE);
-            var $element = isTextNode ? $node.parent() : $node;
+            var node = $node[0];
+            var isTextNode = (node.nodeType === Node.TEXT_NODE);
+            var element = isTextNode ? node.parentElement : node;
             var visibilityPercentage = checkVisibilityByRectangles(
                 $node, true, visibleContentOffsets, frameDimensions);
 
             if (visibilityPercentage) {
                 visibleElements.push({
-                    element: $element[0], // DOM Element is pushed
-                    textNode: isTextNode ? $node[0] : null,
+                    element: element, // DOM Element is pushed
+                    textNode: isTextNode ? node : null,
                     percentVisible: visibilityPercentage
                 });
             }
@@ -25409,23 +22905,31 @@ var CfiNavigationLogic = function(options) {
         return $elements;
     };
 
-    function isElementBlacklisted($element) {
+    function isElementBlacklisted(element) {
         var isBlacklisted = false;
+        var classAttribute = element.className;
+        // check for SVGAnimatedString
+        if (classAttribute && typeof classAttribute.animVal !== "undefined") {
+            classAttribute = classAttribute.animVal;
+        } else if (classAttribute && typeof classAttribute.baseVal !== "undefined") {
+            classAttribute = classAttribute.baseVal;
+        }
+        var classList = classAttribute ? classAttribute.split(' ') : [];
+        var id = element.id;
 
-        _.some(self.getClassBlacklist(), function (value) {
-            if ($element.hasClass(value)) {
-                isBlacklisted = true;
-            }
-            return isBlacklisted;
-        });
+        var classBlacklist = self.getClassBlacklist();
+        if (classList.length === 1 && _.contains(classBlacklist, classList[0])) {
+            isBlacklisted = true;
+            return;
+        } else if (classList.length && _.intersection(classBlacklist, classList).length) {
+            isBlacklisted = true;
+            return;
+        }
 
-        _.some(self.getIdBlacklist(), function (value) {
-            if ($element.attr("id") === value) {
-                isBlacklisted = true;
-            }
-            return isBlacklisted;
-        });
-
+        if (id && id.length && _.contains(self.getIdBlacklist(), id)) {
+            isBlacklisted = true;
+            return;
+        }
 
         return isBlacklisted;
     }
@@ -25454,10 +22958,9 @@ var CfiNavigationLogic = function(options) {
         while ((node = nodeIterator.nextNode())) {
             var isLeafNode = node.nodeType === Node.ELEMENT_NODE && !node.childElementCount && !isValidTextNodeContent(node.textContent);
             if (isLeafNode || isValidTextNode(node)){
-                var $node = $(node);
-                var $element = (node.nodeType === Node.TEXT_NODE) ? $node.parent() : $node;
-                if (!isElementBlacklisted($element)) {
-                    $leafNodeElements.push($node);
+                var element = (node.nodeType === Node.TEXT_NODE) ? node.parentElement : node;
+                if (!isElementBlacklisted(element)) {
+                    $leafNodeElements.push($(node));
                 }
             }
         }
@@ -25485,7 +22988,7 @@ var CfiNavigationLogic = function(options) {
         // If we don't do this, we may get a reference to a node that doesn't get rendered
         // (such as for example a node that has tab character and a bunch of spaces)
         // this is would be bad! ask me why.
-        return text.replace(/[\s\n\r\t]/g, "").length > 0;
+        return !!text.trim().length;
     }
 
     this.getElements = function (selector) {
@@ -25991,11 +23494,11 @@ var ViewerSettings = function(settingsData) {
     }
 }(this, function () {
 
-    //Make sure it does not throw in a SSR (Server Side Rendering) situation
+    // Make sure it does not throw in a SSR (Server Side Rendering) situation
     if (typeof window === "undefined") {
         return null;
     }
-    // Only used for the dirty checking, so the event callback count is limted to max 1 call per fps per sensor.
+    // Only used for the dirty checking, so the event callback count is limited to max 1 call per fps per sensor.
     // In combination with the event based resize sensor this saves cpu time, because the sensor is too fast and
     // would generate too many unnecessary events.
     var requestAnimationFrame = window.requestAnimationFrame ||
@@ -26070,33 +23573,19 @@ var ViewerSettings = function(settingsData) {
         }
 
         /**
-         * @param {HTMLElement} element
-         * @param {String}      prop
-         * @returns {String|Number}
-         */
-        function getComputedStyle(element, prop) {
-            if (element.currentStyle) {
-                return element.currentStyle[prop];
-            } else if (window.getComputedStyle) {
-                return window.getComputedStyle(element, null).getPropertyValue(prop);
-            } else {
-                return element.style[prop];
-            }
-        }
-
-        /**
          *
          * @param {HTMLElement} element
          * @param {Function}    resized
          */
         function attachResizeEvent(element, resized) {
-            if (!element.resizedAttached) {
-                element.resizedAttached = new EventQueue();
-                element.resizedAttached.add(resized);
-            } else if (element.resizedAttached) {
+            if (!element) return;
+            if (element.resizedAttached) {
                 element.resizedAttached.add(resized);
                 return;
             }
+
+            element.resizedAttached = new EventQueue();
+            element.resizedAttached.add(resized);
 
             element.resizeSensor = document.createElement('div');
             element.resizeSensor.className = 'resize-sensor';
@@ -26113,7 +23602,7 @@ var ViewerSettings = function(settingsData) {
                 '</div>';
             element.appendChild(element.resizeSensor);
 
-            if (getComputedStyle(element, 'position') == 'static') {
+            if (element.resizeSensor.offsetParent !== element) {
                 element.style.position = 'relative';
             }
 
@@ -26185,6 +23674,7 @@ var ViewerSettings = function(settingsData) {
 
     ResizeSensor.detach = function(element, ev) {
         forEachElement(element, function(elem){
+            if (!elem) return
             if(elem.resizedAttached && typeof ev == "function"){
                 elem.resizedAttached.remove(ev);
                 if(elem.resizedAttached.length()) return;
@@ -26261,6 +23751,11 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
     var _isIframeLoaded = false;
 
     var _$scaler;
+
+    var _lastBodySize = {
+        width: undefined,
+        height: undefined
+    };
 
     var PageTransitionHandler = function (opts) {
         var PageTransition = function (begin, end) {
@@ -26574,37 +24069,77 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
             _$epubHtml = $("html", epubContentDocument);
             if (!_$epubHtml || _$epubHtml.length == 0) {
                 _$epubHtml = $("svg", epubContentDocument);
+                _$epubBody = undefined;
             } else {
                 _$epubBody = $("body", _$epubHtml);
             }
 
             //_$epubHtml.css("overflow", "hidden");
 
-            if (_enableBookStyleOverrides) {
+            if (_enableBookStyleOverrides) { // not fixed layout (reflowable in scroll view)
                 self.applyBookStyles();
             }
 
             updateMetaSize();
 
-            var bodyElement = _$epubBody[0];
-            bodyElement.resizeSensor = new ResizeSensor(bodyElement, function() {
-                console.log("OnePageView iframe body resized", $(bodyElement).width(), $(bodyElement).height());
-                var src = _spine.package.resolveRelativeUrl(_currentSpineItem.href);
-                Globals.logEvent("OnePageView.Events.CONTENT_SIZE_CHANGED", "EMIT", "one_page_view.js [ " + _currentSpineItem.href + " -- " + src + " ]");
-                self.emit(OnePageView.Events.CONTENT_SIZE_CHANGED, _$iframe, _currentSpineItem);
-                //updatePagination();
-            });
+            initResizeSensor();
 
             _pageTransitionHandler.onIFrameLoad();
         }
     }
 
+    function initResizeSensor() {
+
+        if (_$epubBody // undefined with SVG spine items
+            && _enableBookStyleOverrides // not fixed layout (reflowable in scroll view)
+            ) {
+
+            var bodyElement = _$epubBody[0];
+            if (bodyElement.resizeSensor) {
+                return;
+            }
+
+            // We need to make sure the content has indeed be resized, especially
+            // the first time it is triggered
+            _lastBodySize.width = $(bodyElement).width();
+            _lastBodySize.height = $(bodyElement).height();
+
+            bodyElement.resizeSensor = new ResizeSensor(bodyElement, function() {
+
+                var newBodySize = {
+                    width: $(bodyElement).width(),
+                    height: $(bodyElement).height()
+                };
+
+                console.debug("OnePageView content resized ...", newBodySize.width, newBodySize.height, _currentSpineItem.idref);
+                
+                if (newBodySize.width != _lastBodySize.width || newBodySize.height != _lastBodySize.height) {
+                    _lastBodySize.width = newBodySize.width;
+                    _lastBodySize.height = newBodySize.height;
+
+                    console.debug("... updating pagination.");
+
+                    var src = _spine.package.resolveRelativeUrl(_currentSpineItem.href);
+
+                    Globals.logEvent("OnePageView.Events.CONTENT_SIZE_CHANGED", "EMIT", "one_page_view.js [ " + _currentSpineItem.href + " -- " + src + " ]");
+                    
+                    self.emit(OnePageView.Events.CONTENT_SIZE_CHANGED, _$iframe, _currentSpineItem);
+                    
+                    //updatePagination();
+                } else {
+                    console.debug("... ignored (identical dimensions).");
+                }
+            });
+        }
+    }
+    
     var _viewSettings = undefined;
     this.setViewSettings = function (settings, docWillChange) {
 
         _viewSettings = settings;
 
-        if (_enableBookStyleOverrides && !docWillChange) {
+        if (_enableBookStyleOverrides  // not fixed layout (reflowable in scroll view)
+            && !docWillChange) {
             self.applyBookStyles();
         }
 
@@ -26615,7 +24150,7 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
 
     function updateHtmlFontInfo() {
 
-        if (!_enableBookStyleOverrides) return;
+        if (!_enableBookStyleOverrides) return;  // fixed layout (not reflowable in scroll view)
 
         if (_$epubHtml && _viewSettings) {
             var i = _viewSettings.fontSelection;
@@ -26629,7 +24164,7 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
 
     this.applyBookStyles = function () {
 
-        if (!_enableBookStyleOverrides) return;
+        if (!_enableBookStyleOverrides) return;  // fixed layout (not reflowable in scroll view)
 
         if (_$epubHtml) {
             Helpers.setStyles(_bookStyles.getStyles(), _$epubHtml);
@@ -26639,6 +24174,8 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
 
     //this is called by scroll_view for fixed spine item
     this.scaleToWidth = function (width) {
+
+        if (_enableBookStyleOverrides) return;  // not fixed layout (reflowable in scroll view)
 
         if (_meta_size.width <= 0) return; // resize event too early!
 
@@ -26747,6 +24284,8 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
 
     this.transformContentImmediate = function (scale, left, top) {
 
+        if (_enableBookStyleOverrides) return;  // not fixed layout (reflowable in scroll view)
+
         var elWidth = Math.ceil(_meta_size.width * scale);
         var elHeight = Math.floor(_meta_size.height * scale);
 
@@ -26772,7 +24311,9 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
             enable3D = true;
         }
         
-        if (reader.needsFixedLayoutScalerWorkAround()) {
+        if (_$epubBody // not SVG spine item (otherwise fails in Safari OSX)
+            && reader.needsFixedLayoutScalerWorkAround()) {
+
             var css1 = Helpers.CSSTransformString({scale: scale, enable3D: enable3D});
             
             // See https://github.com/readium/readium-shared-js/issues/285 
@@ -26780,7 +24321,7 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
             css1["min-height"] = _meta_size.height;
             
             _$epubHtml.css(css1);
-            
+
             // Ensures content dimensions matches viewport meta (authors / production tools should do this in their CSS...but unfortunately some don't).
             if (_$epubBody && _$epubBody.length) {
                 _$epubBody.css({width:_meta_size.width, height:_meta_size.height});
@@ -26798,7 +24339,7 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
             css["height"] = _meta_size.height;
             _$scaler.css(css);
         }
-                
+
         // Chrome workaround: otherwise text is sometimes invisible (probably a rendering glitch due to the 3D transform graphics backend?)
         //_$epubHtml.css("visibility", "hidden"); // "flashing" in two-page spread mode is annoying :(
         _$epubHtml.css("opacity", "0.999");
@@ -26826,6 +24367,8 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
 
         _meta_size.width = 0;
         _meta_size.height = 0;
+
+        if (_enableBookStyleOverrides) return; // not fixed layout (reflowable in scroll view)
 
         var size = undefined;
 
@@ -27137,7 +24680,7 @@ var OnePageView = function (options, classes, enableBookStyleOverrides, reader) 
             $iframe: _$iframe,
             frameDimensions: getFrameDimensions,
             visibleContentOffsets: getVisibleContentOffsets,
-            classBlacklist: ["cfi-marker", "mo-cfi-highlight", "resize-sensor", "resize-sensor-expand", "resize-sensor-shrink"],
+            classBlacklist: ["cfi-marker", "mo-cfi-highlight", "resize-sensor", "resize-sensor-expand", "resize-sensor-shrink", "resize-sensor-inner"],
             elementBlacklist: [],
             idBlacklist: ["MathJax_Message", "MathJax_SVG_Hidden"]
         });
@@ -39499,7 +37042,7 @@ var ScrollView = function (options, isContinuousScroll, reader) {
             }
             
             var domRangeAsRange = getDomRangeAsRange(pageView, domRange);
-            if (isRangeIsVisibleOnScreen(pageView, domRangeAsRange, 60)) {
+            if (isRangeIsVisibleOnScreen(domRangeAsRange, 60)) {
                 //TODO refactoring required
                 // this is artificial call because MO player waits for this event to continue playing.
                 onPaginationChanged(pageRequest.initiator, pageRequest.spineItem, pageRequest.elementId);
@@ -47339,7 +44882,7 @@ var ReaderView = function (options) {
 
         if (!ReadiumSDK) return;
 
-        var DEBUG = false; // change this to visualize the CFI range
+        var DEBUG = true; // change this to visualize the CFI range
         if (!DEBUG) return;
             
         var paginationInfo = this.getPaginationInfo();
@@ -48072,6 +45615,6 @@ return ReaderView;
 });
 
 
-require(["readium_cfi_js/cfi_API", "readium_plugin_highlights", "readium_shared_js/globalsSetup"]);
+require(["readium_cfi_js/cfi_API", "readium_shared_js/globalsSetup"]);
 
 //# sourceMappingURL=readium-shared-js_all.js.map

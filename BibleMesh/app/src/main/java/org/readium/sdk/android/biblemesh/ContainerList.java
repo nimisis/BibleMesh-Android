@@ -241,7 +241,7 @@ public class ContainerList extends Activity implements SdkErrorHandler {
 
 		// Loads the native lib and sets the path to use for cache
 		Log.v("library", "cache path:"+getCacheDir().getAbsolutePath());
-		EPub3.setCachePath(getCacheDir().getAbsolutePath());
+		//EPub3.setCachePath(getCacheDir().getAbsolutePath());
 	}
 
 	public boolean onMenuItemSelected(int featureId, MenuItem item) {
