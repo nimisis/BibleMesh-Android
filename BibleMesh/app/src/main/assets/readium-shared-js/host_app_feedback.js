@@ -229,7 +229,7 @@ require(['readium_shared_js/views/reader_view'], function (ReaderView)
                   }
 
         // external (require()'d via Dependency Injection, see examplePluginConfig function parameter passed above)
-        console.log(reader.plugins.example);
+        //console.log(reader.plugins.example);
     });
 
 
